@@ -33,6 +33,7 @@ export interface Note {
   /** ISO date (yyyy-mm-dd) of the sermon. */
   date: string;
   speaker: string;
+  /** Shown as "Location" in the app (where the message was given). */
   church: string;
   /** Main passage as typed, e.g. "Romans 8:28-39". */
   passage: string;

@@ -88,9 +88,9 @@ export function htmlToMarkdown(html: string): string {
 export function noteToMarkdown(n: Note): string {
   const meta = [
     `**Type:** ${kindLabel(n.kind)}`,
-    n.date &&`**Date:** ${formatDate(n.date, { dateStyle: 'full' })}`,
+    n.date && `**Date:** ${formatDate(n.date, { dateStyle: 'full' })}`,
     n.speaker && `**Speaker:** ${n.speaker}`,
-    n.church && `**Church:** ${n.church}`,
+    n.church && `**Location:** ${n.church}`,
     n.passage && `**Passage:** ${n.passage}`,
   ].filter(Boolean);
   const ink = n.ink.length ? '\n\n_(This note also has handwritten notes, viewable in Rubies.)_' : '';

@@ -1,11 +1,11 @@
 import { ActionIcon, Button, ColorSwatch, Divider, Group, SegmentedControl, Tooltip } from '@mantine/core';
 import { Check, Eraser, Hand, Highlighter, PenLine, Plus, Redo2, Trash2, Undo2 } from 'lucide-react';
-import { getStroke } from 'perfect-freehand';
+import { INK_WIDTH, drawStroke as drawInk } from '../ink';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { InkPoint, InkStroke } from '../db';
 
 /** All ink is stored in a 1000-unit-wide space so it scales to any screen width. */
-const WIDTH = 1000;
+const WIDTH = INK_WIDTH;
 const LINE_GAP = 64;
 const MIN_HEIGHT = 1400;
 const PEN_COLORS = ['ink', '#c62828', '#1565c0', '#2e7d32'];
@@ -20,40 +20,8 @@ interface Props {
   onChange: (strokes: InkStroke[]) => void;
 }
 
-function strokePath(s: InkStroke, last = true): Path2D {
-  const outline = getStroke(
-    s.points.map((p) => [p.x, p.y, p.p]),
-    {
-      size: s.size,
-      thinning: s.highlighter ? 0 : 0.55,
-      smoothing: 0.5,
-      streamline: 0.45,
-      simulatePressure: s.points.every((p) => p.p === 0.5),
-      last,
-    },
-  );
-  if (!outline.length) return new Path2D();
-  const d = outline.reduce(
-    (acc, [x0, y0], i, arr) => {
-      const [x1, y1] = arr[(i + 1) % arr.length];
-      acc.push(x0, y0, (x0 + x1) / 2, (y0 + y1) / 2);
-      return acc;
-    },
-    ['M', ...outline[0], 'Q'] as (string | number)[],
-  );
-  d.push('Z');
-  return new Path2D(d.join(' '));
-}
-
 function cssVar(name: string) {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || '#222';
-}
-
-function drawStroke(ctx: CanvasRenderingContext2D, s: InkStroke, last = true) {
-  ctx.globalAlpha = s.highlighter ? 0.38 : 1;
-  ctx.fillStyle = s.color === 'ink' ? cssVar('--fg') : s.color;
-  ctx.fill(strokePath(s, last));
-  ctx.globalAlpha = 1;
 }
 
 /** Squared distance from point (x, y) to segment a–b. */
@@ -165,7 +133,7 @@ export function InkPad({ initial, onChange }: Props) {
       ctx.lineTo(WIDTH, y);
       ctx.stroke();
     }
-    for (const s of strokes) drawStroke(ctx, s);
+    for (const s of strokes) drawInk(ctx, s, cssVar('--fg'));
     setupCanvas(live.current);
   }, [strokes, setupCanvas, height, scale, themeTick]);
 
@@ -238,7 +206,7 @@ export function InkPad({ initial, onChange }: Props) {
     }
     for (const ev of events.length ? events : [e.nativeEvent]) cur.stroke.points.push(toPoint(ev));
     const ctx = setupCanvas(live.current);
-    if (ctx) drawStroke(ctx, cur.stroke, false);
+    if (ctx) drawInk(ctx, cur.stroke, cssVar('--fg'), false);
   };
 
   const onUp = (e: React.PointerEvent) => {

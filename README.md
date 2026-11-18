@@ -9,12 +9,13 @@ Rubies is an installable, offline-first web app (PWA). One codebase runs in Safa
 - **Side-by-side Bible and notes** on iPad landscape, laptops and desktops; Bible and Notes tabs on phones and iPad portrait.
 - **Quick look-ups.** Type a reference into the Bible search box (`John 3:16`, `jn 3:16-18`, `1 Cor 13`, `Ps 23`, `Gen 1:1-2:3`) to jump straight there, or type words for a keyword search. A trailing `*` matches word forms (`forgiv*`), `"double quotes"` match a phrase, and results can be filtered to the Old or New Testament.
 - **Tap verses** to highlight them in 5 colours, bookmark, copy, or **add them to the open note** as a formatted quotation.
-- **Sermon notes** with title, date, speaker, church and main passage. Speaker and church auto-complete and carry over from your last note.
+- **Sermon notes** with title, type (sermon, sermonette or Bible study), date, speaker and location. Speaker and location auto-complete and carry over from your last note.
 - **Rich text:** bold, italic, underline, highlight, headings, lists and quotes. The **Insert verse** button looks up and inserts any passage.
 - **Verse ↔ note links.** Any reference written in a note (like "Rom 5:8") is detected automatically. Verses cited in your notes show a 📓 marker in the Bible, and tapping the verse lists the notes that cite it.
 - **Handwriting** (Write mode) with Apple Pencil pressure, pen colours and sizes, highlighter, eraser, and undo/redo on lined paper. After a pen is detected, fingers scroll instead of drawing (palm rejection); the ✋ button toggles this.
 - **Light and dark themes**, and adjustable Bible and note text sizes.
-- **Backup and restore.** Notes are stored privately on each device (IndexedDB). Settings → Export backup saves a `.json` file, and importing it on another device merges the notes in. Any single note can also be exported as Markdown.
+- **Export & share** (the share button in a note): save as a **Word document** or **PDF** (formatting, Scripture quotes and handwriting included), or send it with the system **Share** sheet (iPad, iPhone, Android, Mac), by **Email**, or **Copy** it as text. In the desktop app, PDFs are saved straight to a file; in a browser, PDF opens the print dialog, where you choose Save as PDF.
+- **Backup and restore.** Notes are stored privately on each device (IndexedDB). Settings → Export backup saves a `.json` file, and importing it on another device merges the notes in.
 
 ## Development
 
@@ -50,12 +51,21 @@ PWAs must be served over **HTTPS** to install. Deploy `dist/` to any static host
 - **Android:** open the site in Chrome → menu → Install app.
 - **Windows / Mac:** open the site in Chrome or Edge → the install icon in the address bar.
 
+### Desktop app (Windows / Mac)
+
+Rubies also runs as a stand-alone desktop program built with Electron. No browser is needed.
+
+```sh
+npm run desktop        # build and open Rubies in its own window
+npm run desktop:win    # build the Windows installer: release/Rubies Setup <version>.exe
+npm run desktop:mac    # build the macOS .dmg (must be run on a Mac)
+```
+
+The installer adds Start menu and desktop shortcuts. The desktop app keeps its own notes, separate from any browser copy, so use Settings → Export / Import backup to move notes between them. The installer isn't code-signed yet, so Windows SmartScreen will show a "Windows protected your PC" warning the first time; choose **More info → Run anyway**.
+
 ### App stores (later)
 
-The same web code can be wrapped without rewriting:
-
-- **Capacitor** for an iPad/iPhone App Store build and a Google Play build. The iOS build needs a Mac with Xcode.
-- **Tauri** for Windows (`.msi`) and macOS (`.dmg`) desktop installers.
+The same web code can be wrapped for the stores without rewriting: **Capacitor** for an iPad/iPhone App Store build and a Google Play build. The iOS build needs a Mac with Xcode.
 
 ## Scripture text
 

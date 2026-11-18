@@ -5,6 +5,7 @@ import {
   Center,
   Group,
   Loader,
+  Menu,
   Modal,
   Radio,
   SegmentedControl,
@@ -19,7 +20,8 @@ import { RichTextEditor } from '@mantine/tiptap';
 import Highlight from '@tiptap/extension-highlight';
 import { useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
-import { ArrowLeft, BookOpen, Check, Loader2, PenLine, Trash2, Type } from 'lucide-react';
+import { ArrowLeft, BookOpen, Check, Copy, FileDown, FileText, Loader2, Mail, PenLine, Share, Share2, Trash2, Type } from 'lucide-react';
+import { canShare, copyNote, emailNote, exportPdf, exportWord, shareNote } from '../exporting';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getPassage, refKeys } from '../bible/kjv';
 import { extractRefs, formatRef, parseRefs, type Ref } from '../bible/reference';
@@ -249,6 +251,7 @@ function Editor_({ initial, onBack, registerInserter, toast }: Props & { initial
           ]}
         />
         <div className="spacer" />
+        <ExportMenu getNote={async () => (await flush(), noteRef.current)} toast={toast} />
         <Tooltip label="Delete note">
           <ActionIcon color="red" onClick={remove} aria-label="Delete note">
             <Trash2 />
@@ -289,7 +292,7 @@ function Editor_({ initial, onBack, registerInserter, toast }: Props & { initial
             onChange={(e) => setField('speaker', e.currentTarget.value)}
             list="speakers"
           />
-          <FloatInput label="Church" value={meta.church} onChange={(e) => setField('church', e.currentTarget.value)} list="churches" />
+          <FloatInput label="Location" value={meta.church} onChange={(e) => setField('church', e.currentTarget.value)} list="churches" />
         </div>
         <datalist id="speakers">
           {suggest.speakers.map((s) => (
@@ -349,6 +352,64 @@ function Editor_({ initial, onBack, registerInserter, toast }: Props & { initial
         }}
       />
     </section>
+  );
+}
+
+/** "Export & share" menu: Word, PDF, and the system share sheet (or email/copy where there is none). */
+function ExportMenu({ getNote, toast }: { getNote: () => Promise<Note>; toast: (msg: string) => void }) {
+  const [busy, setBusy] = useState<string | null>(null);
+
+  const run = (label: string, fn: (n: Note) => Promise<unknown>, done?: (result: unknown) => string | null) => async () => {
+    setBusy(label);
+    try {
+      const result = await fn(await getNote());
+      const msg = done?.(result);
+      if (msg) toast(msg);
+    } catch (err) {
+      console.error(err);
+      toast(`${label} failed: ${(err as Error).message}`);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const sharing = canShare();
+
+  return (
+    <Menu position="bottom-end" shadow="md" width={250} withinPortal>
+      <Menu.Target>
+        <Tooltip label="Export & share">
+          <ActionIcon aria-label="Export and share" loading={!!busy}>
+            <Share />
+          </ActionIcon>
+        </Tooltip>
+      </Menu.Target>
+      <Menu.Dropdown>
+        <Menu.Label>Export</Menu.Label>
+        <Menu.Item leftSection={<FileText size={18} />} onClick={run('Word export', exportWord)}>
+          Word document (.docx)
+        </Menu.Item>
+        <Menu.Item
+          leftSection={<FileDown size={18} />}
+          onClick={run('PDF export', exportPdf, (r) => (r === 'saved' ? 'PDF saved' : null))}
+        >
+          PDF
+        </Menu.Item>
+        <Menu.Divider />
+        <Menu.Label>Share</Menu.Label>
+        {sharing && (
+          <Menu.Item leftSection={<Share2 size={18} />} onClick={run('Share', shareNote)}>
+            Share…
+          </Menu.Item>
+        )}
+        <Menu.Item leftSection={<Mail size={18} />} onClick={run('Email', emailNote)}>
+          Email
+        </Menu.Item>
+        <Menu.Item leftSection={<Copy size={18} />} onClick={run('Copy', copyNote, () => 'Note copied — paste it anywhere')}>
+          Copy text
+        </Menu.Item>
+      </Menu.Dropdown>
+    </Menu>
   );
 }
 
