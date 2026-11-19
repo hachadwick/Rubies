@@ -971,17 +971,30 @@ h2 {
   }
 }
 
-/* The header's Install button blinks until Rubies is installed (it isn't shown at all once it is). */
+/* The header's Install button blinks until Rubies is installed (it isn't shown at all once it is): the icon turns
+   ruby on a tinted background and sends out a ring. Dark mode uses a brighter pink so it stands out. */
 .install-blink {
+  --install-glow: var(--mantine-color-ruby-8);
   animation: install-blink 1.6s ease-in-out infinite;
+}
+[data-mantine-color-scheme='dark'] .install-blink {
+  --install-glow: var(--mantine-color-ruby-3);
 }
 .install-blink:hover,
 .install-blink:focus-visible {
   animation: none;
 }
 @keyframes install-blink {
-  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 color-mix(in srgb, var(--mantine-primary-color-filled) 55%, transparent); }
-  50% { opacity: 0.45; box-shadow: 0 0 0 6px color-mix(in srgb, var(--mantine-primary-color-filled) 0%, transparent); }
+  0%, 100% {
+    color: var(--install-glow);
+    background: color-mix(in srgb, var(--install-glow) 18%, transparent);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--install-glow) 70%, transparent);
+  }
+  50% {
+    color: var(--ai-color);
+    background: transparent;
+    box-shadow: 0 0 0 7px color-mix(in srgb, var(--install-glow) 0%, transparent);
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .install-blink { animation-duration: 3s; }
