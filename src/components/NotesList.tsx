@@ -19,6 +19,7 @@ import { Flame, History, NotebookPen, Plus, Search, Settings } from 'lucide-reac
 import { useMemo, useState } from 'react';
 import { db, hasSpeaker, kindLabel, newNote, NOTE_KINDS, type Note, type NoteKind } from '../db';
 import { todayIso } from '../prayer';
+import { SyncButton } from './SyncControls';
 import { intervalLabel, isStale, reviewedAt, timeAgo } from '../review';
 import { formatDate, noteTitle } from '../util';
 
@@ -148,6 +149,7 @@ export function NotesList({ onOpen, onSettings, onPrayers, reviewEveryDays }: Pr
             </ActionIcon>
           </Indicator>
         </Tooltip>
+        <SyncButton onOpenSettings={onSettings} />
         <ActionIcon onClick={onSettings} aria-label="Settings">
           <Settings />
         </ActionIcon>
@@ -201,7 +203,7 @@ export function NotesList({ onOpen, onSettings, onPrayers, reviewEveryDays }: Pr
               or add it to your note, and switch to <b>Write</b> to take notes with Apple Pencil or a stylus.
             </Text>
             <Text size="sm" c="dimmed">
-              Notes are saved on this device only. Use Settings → Export backup to move them to another device.
+              Notes are saved on this device. To have them on your other devices too, sign in with Google in Settings.
             </Text>
           </Stack>
         )}

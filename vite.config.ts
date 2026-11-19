@@ -14,7 +14,7 @@ export default defineConfig({
         maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
       },
       manifest: {
-        name: 'Rubies — Sermon Notes',
+        name: 'Rubies - Bible Notes',
         short_name: 'Rubies',
         description: 'Sermon note taking with the King James Bible',
         theme_color: '#8b1e3f',

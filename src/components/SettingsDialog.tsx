@@ -20,6 +20,7 @@ import { REVIEW_CHOICES } from '../review';
 import type { Settings } from '../settings';
 import { SERIF } from '../theme';
 import { saveFile } from '../util';
+import { SyncSettings } from './SyncControls';
 
 interface Props {
   opened: boolean;
@@ -126,11 +127,17 @@ export function SettingsDialog({ opened, settings, onChange, onClose, toast }: P
 
         <Divider />
 
+        <Section title="Sync across devices">
+          <SyncSettings />
+        </Section>
+
+        <Divider />
+
         <Section title="Your data">
           <Text size="sm" c="dimmed">
-            Notes, highlights and bookmarks are stored only on this device
-            {persisted === true ? ' (protected from automatic clean-up)' : ''}. Export a backup to keep a copy or to move
-            them to another device, then import it there.
+            Notes, highlights and bookmarks are stored on this device
+            {persisted === true ? ' (protected from automatic clean-up)' : ''}. Export a backup to keep a copy of your
+            own, or to move them to a device that isn’t signed in.
           </Text>
           <Group grow>
             <Button variant="light" leftSection={<Download size={18} />} onClick={doExport}>

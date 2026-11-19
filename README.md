@@ -15,6 +15,7 @@ Rubies is an installable, offline-first web app (PWA). One codebase runs in Safa
 - **Handwriting** (Write mode) with Apple Pencil pressure, pen colours and sizes, highlighter, eraser, and undo/redo on lined paper. After a pen is detected, fingers scroll instead of drawing (palm rejection); the ✋ button toggles this.
 - **Light and dark themes**, and adjustable Bible and note text sizes.
 - **Export & share** (the share button in a note): save as a **Word document** or **PDF** (formatting, Scripture quotes and handwriting included), or send it with the system **Share** sheet (iPad, iPhone, Android, Mac), by **Email**, or **Copy** it as text. In the desktop app, PDFs are saved straight to a file; in a browser, PDF opens the print dialog, where you choose Save as PDF.
+- **Sync with Google Drive.** Sign in with Google (Settings → Sync across devices) and notes, the prayer list, highlights and bookmarks stay the same on every device. They're kept in a hidden Rubies folder in the person's own Google Drive (the `drive.appdata` scope: Rubies can't see any other Drive files). Edits on two devices are merged note by note, newest wins, and deletions carry over.
 - **Backup and restore.** Notes are stored privately on each device (IndexedDB). Settings → Export backup saves a `.json` file, and importing it on another device merges the notes in.
 
 ## Development
@@ -73,6 +74,28 @@ npm run preview:web    # http://localhost:4173/Rubies/
 
 The `/Rubies/` in those two scripts in `package.json` must match the repository name (GitHub Pages serves the site
 at `/<repository>/`, and the letter case matters).
+
+### Sync with Google Drive: one-time setup
+
+Sync needs a Google OAuth client ID (free). Without one, Settings just says sync isn't set up.
+
+1. In [Google Cloud Console](https://console.cloud.google.com/), create a project (e.g. "Rubies").
+2. **APIs & Services → Library**: enable the **Google Drive API**.
+3. **Google Auth Platform → Branding** (the OAuth consent screen): app name Rubies, support email, and the home page
+   `https://hachadwick.github.io/Rubies/`. **Audience**: External. **Data access**: add the scope
+   `.../auth/drive.appdata` (plus `openid`, `email`, `profile`). While the app is in *Testing*, only the Google
+   accounts listed as test users can sign in; choose **Publish app** to let anyone in. `drive.appdata` isn't a
+   sensitive scope, so publishing doesn't need Google's security review.
+4. **Clients → Create client → Web application**. Authorized JavaScript origins:
+   `https://hachadwick.github.io`, `http://localhost:5173` and `http://localhost:4173` (no redirect URIs needed).
+5. Copy the client ID (`….apps.googleusercontent.com`; it isn't a secret) and:
+   - for the published site: repository **Settings → Secrets and variables → Actions → Variables → New variable**
+     named `GOOGLE_CLIENT_ID`, then re-run the publish workflow;
+   - for local development: a `.env.local` file containing `VITE_GOOGLE_CLIENT_ID=…`.
+
+Sign-in uses Google's popup, so it works in browsers and installed web apps but not in the desktop (Electron) app,
+which shows a note instead. Google's sign-in lasts about an hour; after that the cloud icon in the Notes header turns
+yellow and one tap reconnects (changes made meanwhile are kept and sync then).
 
 ### Desktop app (Windows / Mac)
 

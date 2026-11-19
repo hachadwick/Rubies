@@ -14,6 +14,8 @@ import { SplitHandle, useSplit } from './components/SplitHandle';
 import { requestPersistentStorage } from './db';
 import { takeDueReminders } from './prayer';
 import { useSettings } from './settings';
+import { preloadGoogle } from './sync/google';
+import { startSync } from './sync/sync';
 
 const LOC_KEY = 'rubies.location';
 
@@ -55,6 +57,8 @@ export default function App() {
   useEffect(() => {
     load();
     requestPersistentStorage();
+    preloadGoogle();
+    startSync();
   }, [load]);
 
   useEffect(() => {

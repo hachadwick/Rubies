@@ -89,11 +89,27 @@ export interface Prayer {
   updatedAt: number;
 }
 
+/** The tables that are backed up and synced. */
+export const SYNCED_TABLES = ['notes', 'highlights', 'bookmarks', 'prayers'] as const;
+export type SyncedTable = (typeof SYNCED_TABLES)[number];
+
+/**
+ * A record of something deleted on this device, so that syncing removes it everywhere instead of bringing it back
+ * from another device's copy. `key` is "table:id".
+ */
+export interface Tombstone {
+  key: string;
+  table: SyncedTable;
+  id: string;
+  deletedAt: number;
+}
+
 export const db = new Dexie('rubies') as Dexie & {
   notes: EntityTable<Note, 'id'>;
   highlights: EntityTable<Highlight, 'key'>;
   bookmarks: EntityTable<Bookmark, 'key'>;
   prayers: EntityTable<Prayer, 'id'>;
+  tombstones: EntityTable<Tombstone, 'key'>;
 };
 
 db.version(1).stores({
@@ -104,6 +120,25 @@ db.version(1).stores({
 db.version(2).stores({
   prayers: 'id, createdAt, followUpOn',
 });
+db.version(3).stores({
+  tombstones: 'key',
+});
+
+/** Set on a transaction that's applying deletions from the cloud, which already carry their own tombstones. */
+export const FROM_SYNC = '__rubiesFromSync';
+
+// Every delete from a synced table leaves a tombstone (written once the delete has gone through).
+for (const table of SYNCED_TABLES) {
+  db.table(table).hook('deleting', function (primKey, _obj, trans) {
+    for (let t: { parent?: unknown } | undefined = trans; t; t = t.parent as typeof t) {
+      if ((t as Record<string, unknown>)[FROM_SYNC]) return;
+    }
+    trans.on('complete', () => {
+      const id = String(primKey);
+      db.tombstones.put({ key: `${table}:${id}`, table, id, deletedAt: Date.now() }).catch(() => {});
+    });
+  });
+}
 
 /**
  * A new random id. crypto.randomUUID() only exists on HTTPS and localhost, so when Rubies is opened over a
@@ -156,6 +191,8 @@ export interface Backup {
   bookmarks: Bookmark[];
   /** Added later; older backups have none. */
   prayers?: Prayer[];
+  /** Deletions, in the cloud sync file (not in exported backups). */
+  tombstones?: Tombstone[];
 }
 
 export async function exportBackup(): Promise<Backup> {
@@ -191,5 +228,12 @@ export async function importBackup(backup: Backup): Promise<{ notes: number; hig
     await db.highlights.bulkPut(backup.highlights ?? []);
     await db.bookmarks.bulkPut(backup.bookmarks ?? []);
   });
+  // Importing something on purpose brings it back even if it was deleted here before.
+  await db.tombstones.bulkDelete([
+    ...backup.notes.map((n) => `notes:${n.id}`),
+    ...(backup.prayers ?? []).map((p) => `prayers:${p.id}`),
+    ...(backup.highlights ?? []).map((h) => `highlights:${h.key}`),
+    ...(backup.bookmarks ?? []).map((b) => `bookmarks:${b.key}`),
+  ]);
   return { notes, highlights: backup.highlights?.length ?? 0, bookmarks: backup.bookmarks?.length ?? 0, prayers };
 }
