@@ -190,7 +190,7 @@ export function InstallButton({ variant }: { variant: 'header' | 'settings' }) {
     <>
       {inHeader ? (
         <Tooltip label="Install Rubies as an app">
-          <ActionIcon onClick={install} aria-label="Install Rubies as an app">
+          <ActionIcon onClick={install} aria-label="Install Rubies as an app" className="install-blink">
             <MonitorDown />
           </ActionIcon>
         </Tooltip>

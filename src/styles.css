@@ -970,3 +970,19 @@ h2 {
     display: none;
   }
 }
+
+/* The header's Install button blinks until Rubies is installed (it isn't shown at all once it is). */
+.install-blink {
+  animation: install-blink 1.6s ease-in-out infinite;
+}
+.install-blink:hover,
+.install-blink:focus-visible {
+  animation: none;
+}
+@keyframes install-blink {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 color-mix(in srgb, var(--mantine-primary-color-filled) 55%, transparent); }
+  50% { opacity: 0.45; box-shadow: 0 0 0 6px color-mix(in srgb, var(--mantine-primary-color-filled) 0%, transparent); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .install-blink { animation-duration: 3s; }
+}
