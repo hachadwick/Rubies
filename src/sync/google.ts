@@ -167,12 +167,27 @@ export async function findSyncFile(token: string): Promise<string | null> {
   return r.files?.[0]?.id ?? null;
 }
 
+/** Reads a JSON file from Rubies' Drive folder (the sync file, or a Library book's text). */
 export async function downloadSyncFile(token: string, id: string): Promise<unknown> {
   return (await call(token, `${DRIVE}/files/${id}?alt=media`)).json();
 }
 
 /** Saves the sync file (creating it the first time) and returns its id. */
-export async function uploadSyncFile(token: string, id: string | null, data: unknown): Promise<string> {
+export function uploadSyncFile(token: string, id: string | null, data: unknown): Promise<string> {
+  return uploadFile(token, id, FILE_NAME, data);
+}
+
+/** Deletes a file from Rubies' Drive folder. Already gone is fine. */
+export async function deleteFile(token: string, id: string): Promise<void> {
+  try {
+    await call(token, `${DRIVE}/files/${id}`, { method: 'DELETE' });
+  } catch (e) {
+    if (!(e instanceof GoogleError && e.status === 404)) throw e;
+  }
+}
+
+/** Saves a JSON file in Rubies' Drive folder (creating it when there's no id yet) and returns its id. */
+export async function uploadFile(token: string, id: string | null, name: string, data: unknown): Promise<string> {
   const body = JSON.stringify(data);
   if (id) {
     await call(token, `${UPLOAD}/files/${id}?uploadType=media`, {
@@ -185,7 +200,7 @@ export async function uploadSyncFile(token: string, id: string | null, data: unk
   const boundary = `rubies${Math.random().toString(36).slice(2)}`;
   const multipart =
     `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n` +
-    JSON.stringify({ name: FILE_NAME, parents: ['appDataFolder'], mimeType: 'application/json' }) +
+    JSON.stringify({ name, parents: ['appDataFolder'], mimeType: 'application/json' }) +
     `\r\n--${boundary}\r\nContent-Type: application/json\r\n\r\n${body}\r\n--${boundary}--`;
   const r = await call(token, `${UPLOAD}/files?uploadType=multipart&fields=id`, {
     method: 'POST',

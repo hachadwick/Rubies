@@ -726,3 +726,163 @@ h2 {
   background: color-mix(in srgb, var(--mantine-color-orange-filled) 10%, var(--mantine-color-body));
   color: var(--mantine-color-orange-light-color);
 }
+
+/* ---------- Reading pane: Bible / Library switch ---------- */
+.reader-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 6px 10px 0;
+  background: var(--head-bg);
+}
+.reader-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px 8px;
+  border-bottom: 2px solid transparent;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--mantine-color-dimmed);
+  transition: color 0.15s, border-color 0.15s;
+}
+@media (hover: hover) {
+  .reader-tab:hover {
+    color: var(--fg);
+  }
+}
+.reader-tab[data-active] {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+/* ---------- Library ---------- */
+/* Search, with the Previous / Next section buttons beside it (just the arrows on a phone). */
+.lookup-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+@media (max-width: 520px) {
+  .lookup-nav-label {
+    display: none;
+  }
+  .lookup-row .mantine-Button-section {
+    margin: 0;
+  }
+}
+.book-card {
+  padding: 10px 8px 10px 12px;
+}
+.book-open {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+/* The book and section name in the header: shrinks (with "…") rather than widening the pane. */
+.pane-head > .lib-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  contain: inline-size;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--mantine-radius-md);
+  line-height: 1.25;
+}
+@media (hover: hover) {
+  .lib-title:hover {
+    background: var(--soft);
+  }
+}
+.lib-title-text {
+  min-width: 0;
+  overflow: hidden;
+}
+.lib-title-chevron {
+  flex-shrink: 0;
+  color: var(--mantine-color-dimmed);
+}
+.book-para {
+  margin: 0 0 0.9em;
+}
+.book-heading {
+  margin: 1.4em 0 0.7em;
+  font-weight: 650;
+  font-size: 1.06em;
+  line-height: 1.35;
+}
+.book-heading .sent {
+  display: table;
+}
+/* A chapter's opening heading, like the Bible's chapter title. */
+.book-text > .book-heading:first-child {
+  margin: 10px 0 18px;
+  font: 600 1.35em/1.25 var(--serif);
+}
+.book-text > .book-heading:first-child .sent-label {
+  font-size: 0.6em;
+  font-family: var(--mantine-font-family);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.book-text > .book-heading:first-child .sent + .sent {
+  font-size: 1em;
+  font-weight: 600;
+  color: inherit;
+}
+.book-heading .sent + .sent {
+  font-weight: 500;
+  font-size: 0.92em;
+  color: var(--mantine-color-dimmed);
+}
+.sent {
+  border-radius: 4px;
+  cursor: pointer;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  transition: background 0.3s, box-shadow 0.15s;
+  -webkit-user-select: none;
+  user-select: none;
+}
+@media (hover: hover) {
+  .sent:hover {
+    background: var(--soft);
+    box-shadow: 0 0 0 1px var(--border);
+  }
+}
+.sent.selected {
+  background: var(--accent-soft);
+  box-shadow: 0 0 0 2px var(--accent);
+}
+.sent.flash {
+  animation: flash 2s ease-out;
+}
+.pg-mark {
+  float: right;
+  margin: 0.35em 0 0 10px;
+  font: 600 11px/1 var(--mantine-font-family);
+  letter-spacing: 0.03em;
+  color: var(--mantine-color-dimmed);
+  -webkit-user-select: none;
+  user-select: none;
+}
+.section-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: var(--mantine-radius-md);
+}
+@media (hover: hover) {
+  .section-row:hover {
+    background: var(--soft);
+  }
+}
+.section-row[data-active] {
+  background: var(--accent-soft);
+}

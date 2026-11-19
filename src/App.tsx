@@ -1,11 +1,13 @@
 import { Button, Center, Loader, Stack, Text, ThemeIcon, UnstyledButton } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
-import { BellRing, BookOpen, Flame, NotebookPen, TriangleAlert } from 'lucide-react';
+import { BellRing, BookOpen, Flame, Library, NotebookPen, TriangleAlert } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { loadBible } from './bible/kjv';
-import type { Ref } from './bible/reference';
 import { BiblePane, type BibleLocation } from './components/BiblePane';
+import { LibraryPane } from './components/LibraryPane';
+import { ReaderTabs, type Reader } from './components/ReaderTabs';
+import type { Insertion } from './insertion';
 import { NoteEditor } from './components/NoteEditor';
 import { NotesList } from './components/NotesList';
 import { SettingsDialog } from './components/SettingsDialog';
@@ -18,6 +20,15 @@ import { preloadGoogle } from './sync/google';
 import { startSync } from './sync/sync';
 
 const LOC_KEY = 'rubies.location';
+const READER_KEY = 'rubies.reader';
+
+function readReader(): Reader {
+  try {
+    return localStorage.getItem(READER_KEY) === 'library' ? 'library' : 'bible';
+  } catch {
+    return 'bible';
+  }
+}
 
 function readLocation(): BibleLocation {
   try {
@@ -43,7 +54,8 @@ export default function App() {
   const [noteId, setNoteId] = useState<string | null>(null);
   const [loc, setLoc] = useState<BibleLocation>(readLocation);
   const [showSettings, setShowSettings] = useState(false);
-  const inserter = useRef<((refs: Ref[]) => void) | null>(null);
+  const [reader, setReader] = useState<Reader>(readReader);
+  const inserter = useRef<((what: Insertion) => void) | null>(null);
   const [canInsert, setCanInsert] = useState(false);
   const { split, setSplit, style: splitStyle } = useSplit();
 
@@ -69,7 +81,15 @@ export default function App() {
     }
   }, [loc.book, loc.chapter]);
 
-  const registerInserter = useCallback((fn: ((refs: Ref[]) => void) | null) => {
+  useEffect(() => {
+    try {
+      localStorage.setItem(READER_KEY, reader);
+    } catch {
+      /* ignore */
+    }
+  }, [reader]);
+
+  const registerInserter = useCallback((fn: ((what: Insertion) => void) | null) => {
     inserter.current = fn;
     setCanInsert(!!fn);
   }, []);
@@ -145,22 +165,26 @@ export default function App() {
       </Center>
     );
 
+  const insert = (what: Insertion) => {
+    inserter.current?.(what);
+    if (!wide) setTab('notes');
+  };
+  const readerTabs = <ReaderTabs value={reader} onChange={setReader} />;
+
   return (
     <div className={`app ${wide ? 'wide' : 'narrow'} show-${tab}`} style={wide ? splitStyle : undefined}>
-      <BiblePane
-        loc={loc}
-        onNavigate={setLoc}
-        onInsert={
-          canInsert
-            ? (refs) => {
-                inserter.current?.(refs);
-                if (!wide) setTab('notes');
-              }
-            : undefined
-        }
-        onOpenNote={openNote}
-        toast={toast}
-      />
+      {reader === 'bible' ? (
+        <BiblePane
+          loc={loc}
+          onNavigate={setLoc}
+          onInsert={canInsert ? (refs) => insert({ kind: 'bible', refs }) : undefined}
+          onOpenNote={openNote}
+          toast={toast}
+          tabs={readerTabs}
+        />
+      ) : (
+        <LibraryPane tabs={readerTabs} onInsert={canInsert ? insert : undefined} toast={toast} />
+      )}
       {wide && <SplitHandle split={split} onChange={setSplit} />}
       {noteId ? (
         <NoteEditor
@@ -186,7 +210,7 @@ export default function App() {
         <nav className="tabbar" aria-label="Sections">
           {(
             [
-              ['bible', 'Bible', BookOpen],
+              ['bible', reader === 'library' ? 'Library' : 'Bible', reader === 'library' ? Library : BookOpen],
               ['notes', 'Notes', NotebookPen],
             ] as const
           ).map(([key, label, Icon]) => (

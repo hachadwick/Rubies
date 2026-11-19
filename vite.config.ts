@@ -10,8 +10,9 @@ export default defineConfig({
       registerType: 'prompt',
       includeAssets: ['icon.svg'],
       workbox: {
-        // The KJV text (~4.5 MB) is precached so the Bible works fully offline.
-        globPatterns: ['**/*.{js,css,html,svg,png,json,woff2}'],
+        // The KJV text (~4.5 MB) is precached so the Bible works fully offline, and the PDF reader (for
+        // importing books into the Library) so that works offline too.
+        globPatterns: ['**/*.{js,mjs,css,html,svg,png,json,woff2}'],
         maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
         // The privacy policy is its own page, not part of the app.
         navigateFallbackDenylist: [/privacy\.html$/],

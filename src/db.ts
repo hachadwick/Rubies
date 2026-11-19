@@ -89,8 +89,46 @@ export interface Prayer {
   updatedAt: number;
 }
 
+/**
+ * A book imported into the Library from a PDF. Its text is stored as sections (chapters) in `librarySections`,
+ * each loaded on its own like a chapter of the Bible.
+ *
+ * With sync on, the list of books goes in the sync file like notes do, and each book's text is its own file in
+ * the same Google Drive folder (`fileId`), uploaded once and downloaded once by each device. Books aren't part of
+ * exported backups.
+ */
+export interface LibraryBook {
+  id: string;
+  title: string;
+  author: string;
+  fileName: string;
+  pageCount: number;
+  /** Each section's title and the page it starts on. */
+  sections: { title: string; pg: string }[];
+  importedAt: number;
+  updatedAt: number;
+  /** The Google Drive file holding the book's text, once it has been uploaded for syncing. */
+  fileId?: string;
+}
+
+/** The file in Google Drive holding one book's text. */
+export interface LibraryBookFile {
+  app: 'rubies-book';
+  version: 1;
+  book: LibraryBook;
+  sections: LibrarySection[];
+}
+
+export interface LibrarySection {
+  bookId: string;
+  index: number;
+  title: string;
+  /** Paragraphs of sentences; `pg` is the printed page each starts on ('' if unknown), `h` marks headings. */
+  paras: { s: string[]; pg: string; h?: 1 }[];
+}
+
 /** The tables that are backed up and synced. */
-export const SYNCED_TABLES = ['notes', 'highlights', 'bookmarks', 'prayers'] as const;
+export const SYNCED_TABLES = ['notes', 'highlights', 'bookmarks', 'prayers', 'libraryBooks'] as const;
 export type SyncedTable = (typeof SYNCED_TABLES)[number];
 
 /**
@@ -110,6 +148,8 @@ export const db = new Dexie('rubies') as Dexie & {
   bookmarks: EntityTable<Bookmark, 'key'>;
   prayers: EntityTable<Prayer, 'id'>;
   tombstones: EntityTable<Tombstone, 'key'>;
+  libraryBooks: EntityTable<LibraryBook, 'id'>;
+  librarySections: Dexie.Table<LibrarySection, [string, number]>;
 };
 
 db.version(1).stores({
@@ -122,6 +162,10 @@ db.version(2).stores({
 });
 db.version(3).stores({
   tombstones: 'key',
+});
+db.version(4).stores({
+  libraryBooks: 'id, importedAt',
+  librarySections: '[bookId+index], bookId',
 });
 
 /** Set on a transaction that's applying deletions from the cloud, which already carry their own tombstones. */
@@ -193,6 +237,8 @@ export interface Backup {
   prayers?: Prayer[];
   /** Deletions, in the cloud sync file (not in exported backups). */
   tombstones?: Tombstone[];
+  /** The Library's books (without their text), in the cloud sync file (not in exported backups). */
+  libraryBooks?: LibraryBook[];
 }
 
 export async function exportBackup(): Promise<Backup> {

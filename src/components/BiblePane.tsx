@@ -53,6 +53,8 @@ interface Props {
   onInsert?: (refs: Ref[]) => void;
   onOpenNote: (id: string) => void;
   toast: (msg: string) => void;
+  /** The Bible / Library switch, shown at the top of the pane. */
+  tabs?: React.ReactNode;
 }
 
 export const HIGHLIGHT_COLORS: HighlightColor[] = ['yellow', 'green', 'blue', 'pink', 'orange'];
@@ -87,7 +89,7 @@ export function passageText(refs: Ref[]): string {
 
 type Panel = { kind: 'search'; query: string; testament?: 'OT' | 'NT'; result: SearchResult } | { kind: 'saved' } | null;
 
-export function BiblePane({ loc, onNavigate, onInsert, onOpenNote, toast }: Props) {
+export function BiblePane({ loc, onNavigate, onInsert, onOpenNote, toast, tabs }: Props) {
   const { book, chapter } = loc;
   const [picking, setPicking] = useState(false);
   const [query, setQuery] = useState('');
@@ -212,6 +214,7 @@ export function BiblePane({ loc, onNavigate, onInsert, onOpenNote, toast }: Prop
 
   return (
     <section className="pane bible-pane" aria-label="Bible">
+      {tabs}
       <header className="pane-head">
         <Button
           variant="subtle"

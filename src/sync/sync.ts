@@ -1,7 +1,9 @@
 import Dexie from 'dexie';
 import { useSyncExternalStore } from 'react';
-import { db, FROM_SYNC, SYNCED_TABLES, type Backup } from '../db';
+import { db, FROM_SYNC, SYNCED_TABLES, type Backup, type LibraryBook } from '../db';
+import { applyBooks, fetchBooks, removeBookFiles, uploadNewBooks, type BookDrive } from './books';
 import {
+  deleteFile,
   downloadSyncFile,
   findSyncFile,
   getProfile,
@@ -9,6 +11,7 @@ import {
   requestToken,
   revokeToken,
   syncSupported,
+  uploadFile,
   uploadSyncFile,
   type Profile,
   type Token,
@@ -16,7 +19,8 @@ import {
 import { emptySyncData, localChanges, mergeSyncData, sameData, type SyncData } from './merge';
 
 /**
- * Keeps this device's notes, prayer list, highlights and bookmarks in step with a file in the person's Google Drive.
+ * Keeps this device's notes, prayer list, highlights, bookmarks and Library books in step with a file in the
+ * person's Google Drive (each book's text is a file of its own; see books.ts).
  *
  * Each sync downloads the file, merges it with what's on this device (see merge.ts), applies the result here and
  * uploads it if anything changed. It runs when the app opens, a few seconds after each change, when the app comes
@@ -101,14 +105,17 @@ export function useSyncState(): SyncState {
 // --- Syncing ----------------------------------------------------------------------------------------------------
 
 async function readLocal(): Promise<SyncData> {
-  const [notes, highlights, bookmarks, prayers, tombstones] = await Promise.all([
+  const [notes, highlights, bookmarks, prayers, books, tombstones] = await Promise.all([
     db.notes.toArray(),
     db.highlights.toArray(),
     db.bookmarks.toArray(),
     db.prayers.toArray(),
+    db.libraryBooks.toArray(),
     db.tombstones.toArray(),
   ]);
-  return { notes, highlights, bookmarks, prayers, tombstones };
+  // A book goes in the list once its text is in Drive (see uploadNewBooks).
+  const libraryBooks = books.filter((b) => b.fileId);
+  return { notes, highlights, bookmarks, prayers, libraryBooks, tombstones };
 }
 
 function parseRemote(raw: unknown): SyncData {
@@ -119,24 +126,38 @@ function parseRemote(raw: unknown): SyncData {
     highlights: b.highlights ?? [],
     bookmarks: b.bookmarks ?? [],
     prayers: b.prayers ?? [],
+    libraryBooks: b.libraryBooks ?? [],
     tombstones: b.tombstones ?? [],
+  };
+}
+
+function bookDrive(token: string): BookDrive {
+  return {
+    upload: (name, data) => uploadFile(token, null, name, data),
+    download: (id) => downloadSyncFile(token, id),
+    remove: (id) => deleteFile(token, id),
   };
 }
 
 /** Our own writes also fire Dexie's change event; changes landing just after a sync are ours, not the person's. */
 let ignoreChangesUntil = 0;
 
-async function applyLocal(local: SyncData, merged: SyncData) {
+async function applyLocal(local: SyncData, merged: SyncData, drive: BookDrive) {
   const c = localChanges(local, merged);
   const any = SYNCED_TABLES.some((t) => c[t].put.length || c[t].remove.length) || c.tombstones.length;
   if (!any) return;
-  await db.transaction('rw', [db.notes, db.highlights, db.bookmarks, db.prayers, db.tombstones], async (tx) => {
+  // New books' text is downloaded first (it can't be fetched inside a database transaction).
+  const books = await fetchBooks(drive, c.libraryBooks.put as LibraryBook[]);
+  const tables = [db.notes, db.highlights, db.bookmarks, db.prayers, db.libraryBooks, db.librarySections, db.tombstones];
+  await db.transaction('rw', tables, async (tx) => {
     (tx as unknown as Record<string, unknown>)[FROM_SYNC] = true;
     for (const t of SYNCED_TABLES) {
+      if (t === 'libraryBooks') continue;
       const table = db.table(t);
       if (c[t].put.length) await table.bulkPut(c[t].put);
       if (c[t].remove.length) await table.bulkDelete(c[t].remove);
     }
+    await applyBooks(books, c.libraryBooks.remove);
     if (c.tombstones.length) await db.tombstones.bulkPut(c.tombstones);
   });
   ignoreChangesUntil = Date.now() + 1500;
@@ -161,13 +182,17 @@ async function runSync(): Promise<void> {
       }
     }
     const remote = parseRemote(remoteRaw);
+    const drive = bookDrive(t);
+    if (await uploadNewBooks(drive)) ignoreChangesUntil = Date.now() + 1500;
     const local = await readLocal();
     const merged = mergeSyncData(local, remote);
-    await applyLocal(local, merged);
+    await applyLocal(local, merged, drive);
     if (!fileId || !sameData(merged, remote)) {
       const file: Backup = { app: 'rubies', version: 1, exportedAt: new Date().toISOString(), ...merged };
       fileId = await uploadSyncFile(t, fileId, file);
     }
+    // Books removed (here or on another device) no longer need their text in Drive.
+    await removeBookFiles(drive, remote.libraryBooks, merged.libraryBooks);
     const now = Date.now();
     save({ fileId, lastSyncedAt: now });
     set({ status: 'idle', lastSyncedAt: now });

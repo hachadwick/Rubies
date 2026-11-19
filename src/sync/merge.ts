@@ -1,20 +1,22 @@
-import type { Bookmark, Highlight, Note, Prayer, SyncedTable, Tombstone } from '../db';
+import type { Bookmark, Highlight, LibraryBook, Note, Prayer, SyncedTable, Tombstone } from '../db';
 
-/** Everything that syncs: the four tables plus the deletions. */
+/** Everything that syncs: the tables plus the deletions. (Library books here are the list; their text is separate.) */
 export interface SyncData {
   notes: Note[];
   highlights: Highlight[];
   bookmarks: Bookmark[];
   prayers: Prayer[];
+  libraryBooks: LibraryBook[];
   tombstones: Tombstone[];
 }
 
-type Rec = Note | Highlight | Bookmark | Prayer;
+type Rec = Note | Highlight | Bookmark | Prayer | LibraryBook;
 
 /** Each record's id, and the time that decides which copy is newer. */
 const KEYS: Record<SyncedTable, { id: (r: Rec) => string; version: (r: Rec) => number }> = {
   notes: { id: (r) => (r as Note).id, version: (r) => (r as Note).updatedAt ?? 0 },
   prayers: { id: (r) => (r as Prayer).id, version: (r) => (r as Prayer).updatedAt ?? 0 },
+  libraryBooks: { id: (r) => (r as LibraryBook).id, version: (r) => (r as LibraryBook).updatedAt ?? 0 },
   // Highlights and bookmarks are replaced, not edited, so when they were made is their version.
   highlights: { id: (r) => (r as Highlight).key, version: (r) => (r as Highlight).createdAt ?? 0 },
   bookmarks: { id: (r) => (r as Bookmark).key, version: (r) => (r as Bookmark).createdAt ?? 0 },
@@ -55,8 +57,8 @@ export function localChanges(local: SyncData, merged: SyncData) {
   const changes = {} as Record<SyncedTable, { put: Rec[]; remove: string[] }>;
   for (const table of TABLES) {
     const { id, version } = KEYS[table];
-    const mine = new Map((local[table] as Rec[]).map((r) => [id(r), r]));
-    const theirs = new Map((merged[table] as Rec[]).map((r) => [id(r), r]));
+    const mine = new Map(((local[table] ?? []) as Rec[]).map((r) => [id(r), r]));
+    const theirs = new Map(((merged[table] ?? []) as Rec[]).map((r) => [id(r), r]));
     changes[table] = {
       put: [...theirs.values()].filter((r) => {
         const m = mine.get(id(r));
@@ -74,7 +76,7 @@ export function localChanges(local: SyncData, merged: SyncData) {
 export function sameData(a: SyncData, b: SyncData): boolean {
   for (const table of TABLES) {
     const { id, version } = KEYS[table];
-    const as = a[table] as Rec[];
+    const as = (a[table] ?? []) as Rec[];
     const bs = (b[table] ?? []) as Rec[];
     if (as.length !== bs.length) return false;
     const bv = new Map(bs.map((r) => [id(r), version(r)]));
@@ -84,4 +86,4 @@ export function sameData(a: SyncData, b: SyncData): boolean {
   return a.tombstones.length === bt.size && a.tombstones.every((t) => bt.get(t.key) === t.deletedAt);
 }
 
-export const emptySyncData = (): SyncData => ({ notes: [], highlights: [], bookmarks: [], prayers: [], tombstones: [] });
+export const emptySyncData = (): SyncData => ({ notes: [], highlights: [], bookmarks: [], prayers: [], libraryBooks: [], tombstones: [] });

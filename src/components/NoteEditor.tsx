@@ -30,13 +30,14 @@ import { ConfirmDialog } from './ConfirmDialog';
 import { PrayerQuickAdd } from './PrayerQuickAdd';
 import { SERIF } from '../theme';
 import { Quote, QuoteCite } from '../quote';
+import type { Insertion } from '../insertion';
 import { isStale, reviewedAt, timeAgo } from '../review';
 
 interface Props {
   noteId: string;
   onBack: () => void;
-  /** Lets the Bible pane insert verses into this note while it is open. */
-  registerInserter: (fn: ((refs: Ref[]) => void) | null) => void;
+  /** Lets the Bible and Library insert passages into this note while it is open. */
+  registerInserter: (fn: ((what: Insertion) => void) | null) => void;
   toast: (msg: string) => void;
   /** Opens the prayer list over the note. */
   onOpenPrayers: () => void;
@@ -93,6 +94,11 @@ function passageHtml(refs: Ref[]): string {
       })
       .join('') + '<p></p>'
   );
+}
+
+/** Sentences from a Library book, as a quote naming the book and page. */
+function bookQuoteHtml(paragraphs: string[], cite: string): string {
+  return `<blockquote>${paragraphs.map((p) => `<p>${escapeHtml(p)}</p>`).join('')}<cite>${escapeHtml(cite)}</cite></blockquote><p></p>`;
 }
 
 /**
@@ -187,11 +193,19 @@ function Editor_({ initial, onBack, registerInserter, toast, onOpenPrayers, revi
   });
 
   const insert = useCallback(
-    (refs: Ref[]) => {
-      if (!editor || !refs.length) return;
-      setMode('type');
-      editor.chain().focus().insertContent(passageHtml(refs)).run();
-      toast(`Added ${refsLabel(refs)} to note`);
+    (what: Insertion) => {
+      if (!editor) return;
+      if (what.kind === 'bible') {
+        if (!what.refs.length) return;
+        setMode('type');
+        editor.chain().focus().insertContent(passageHtml(what.refs)).run();
+        toast(`Added ${refsLabel(what.refs)} to note`);
+      } else {
+        if (!what.paragraphs.length) return;
+        setMode('type');
+        editor.chain().focus().insertContent(bookQuoteHtml(what.paragraphs, what.cite)).run();
+        toast(`Added quote from ${what.cite} to note`);
+      }
     },
     [editor, toast],
   );
