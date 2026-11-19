@@ -45,6 +45,8 @@ import type { Insertion } from '../insertion';
 import { citation, deleteBook, importPdf, normalize } from '../library/library';
 import { sectionRefs, type FoundRef } from '../library/refs';
 import { HIGHLIGHT_COLORS } from './BiblePane';
+import { ListenButton, PlayerBar, useFollowReading, useStopOnUnmount } from './ReadAloud';
+import { startReading, stopReading, useReading } from '../speech';
 import { syncSupported } from '../sync/google';
 import { useSyncState } from '../sync/sync';
 import { copyText } from '../util';
@@ -380,6 +382,33 @@ function Reader({
   // Bible references in the text, to show as links.
   const refs = useMemo(() => (section ? sectionRefs(section.paras) : new Map<string, FoundRef[]>()), [section]);
 
+  // Reading aloud: the section's name (unless it opens with its own heading), then every sentence. At the end,
+  // carry on to the next section.
+  const reading = useReading();
+  const keepReading = useRef(false);
+  const listen = (from?: string) => {
+    if (!section) return;
+    const pieces = [
+      ...(section.paras[0]?.h ? [] : [{ id: 'title', text: `${book.sections[index]?.title ?? ''}.` }]),
+      ...section.paras.flatMap((p, pi) => p.s.map((text, si) => ({ id: `${pi}:${si}`, text: p.h ? `${text}.` : text }))),
+    ];
+    startReading('library', pieces, from ? Math.max(0, pieces.findIndex((x) => x.id === from)) : 0, () => {
+      if (index >= book.sections.length - 1) return;
+      keepReading.current = true;
+      go(index + 1);
+    });
+  };
+  useEffect(() => {
+    if (!section || section.index !== index) return;
+    // Going somewhere else by hand stops the reading; reaching the end of a section carries on.
+    if (!keepReading.current) return stopReading('library');
+    keepReading.current = false;
+    listen();
+  }, [section?.index, book.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  useStopOnUnmount('library');
+  useFollowReading('library', (id) => scroller.current?.querySelector(id === 'title' ? '.chapter-title' : `[data-s="${id}"]`));
+  const readingKey = reading.owner === 'library' && reading.status !== 'idle' ? reading.current : undefined;
+
   // On moving to another section or a search result: clear the selection, scroll, and flash the sentence.
   useEffect(() => {
     setSelected([]);
@@ -542,6 +571,18 @@ function Reader({
         <ActionIcon onClick={() => go(index + 1)} aria-label="Next section" disabled={atEnd}>
           <ChevronRight />
         </ActionIcon>
+        {/* From the first selected sentence, if any. */}
+        <ListenButton
+          owner="library"
+          onStart={() =>
+            listen(
+              selected
+                .map((k) => k.split(':').map(Number))
+                .sort((a, b) => a[0] - b[0] || a[1] - b[1])
+                .map((k) => k.join(':'))[0],
+            )
+          }
+        />
         <Tooltip label="Bookmarks & highlights">
           <ActionIcon
             variant={saved ? 'light' : 'subtle'}
@@ -674,6 +715,7 @@ function Reader({
                         hl && `hl-${hl}`,
                         selected.includes(key) && 'selected',
                         inFlash(pi, si) && 'flash',
+                        readingKey === key && 'reading',
                       ]
                         .filter(Boolean)
                         .join(' ')}
@@ -744,6 +786,8 @@ function Reader({
           </Group>
         </Paper>
       )}
+
+      {!search && !saved && <PlayerBar owner="library" title={book.sections[index]?.title ?? book.title} />}
 
       <Modal opened={picking} onClose={() => setPicking(false)} title={book.title} radius="lg" size="md">
         <Stack gap={2}>

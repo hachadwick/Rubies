@@ -36,6 +36,8 @@ import { formatRef, parseKey, parseRefs, type Ref, verseKey } from '../bible/ref
 import { db, type HighlightColor, type Note } from '../db';
 import { copyText, noteTitle } from '../util';
 import { BookPicker } from './BookPicker';
+import { ListenButton, PlayerBar, useFollowReading, useStopOnUnmount } from './ReadAloud';
+import { startReading, stopReading, useReading } from '../speech';
 
 export interface BibleLocation {
   book: number;
@@ -97,6 +99,9 @@ export function BiblePane({ loc, onNavigate, onInsert, onOpenNote, toast, tabs }
   const [selected, setSelected] = useState<number[]>([]);
   const [flash, setFlash] = useState<[number, number] | null>(null);
   const scroller = useRef<HTMLDivElement>(null);
+  const reading = useReading();
+  /** Set when reading aloud reaches the end of a chapter, to carry on with the next one. */
+  const keepReading = useRef(false);
 
   const verses = useMemo(() => getChapter(book, chapter), [book, chapter]);
   const prefix = `${book}:${chapter}:`;
@@ -136,6 +141,29 @@ export function BiblePane({ loc, onNavigate, onInsert, onOpenNote, toast, tabs }
     }
     el.scrollTop = 0;
   }, [book, chapter, loc.focus, loc.nonce]);
+
+  // Reading aloud: the chapter heading, then each verse. At the end, carry on to the next chapter.
+  const listen = (from = 0) => {
+    startReading(
+      'bible',
+      [{ id: 'title', text: `${bookById(book).name}, chapter ${chapter}.` }, ...verses.map((v) => ({ id: String(v.verse), text: v.text }))],
+      from,
+      () => {
+        if (book === 66 && chapter === 22) return;
+        keepReading.current = true;
+        step(1);
+      },
+    );
+  };
+  useEffect(() => {
+    // Going somewhere else by hand stops the reading; reaching the end of a chapter carries on.
+    if (!keepReading.current) return stopReading('bible');
+    keepReading.current = false;
+    listen();
+  }, [book, chapter]); // eslint-disable-line react-hooks/exhaustive-deps
+  useStopOnUnmount('bible');
+  useFollowReading('bible', (id) => scroller.current?.querySelector(id === 'title' ? '.chapter-title' : `[data-verse="${id}"]`));
+  const readingVerse = reading.owner === 'bible' && reading.status !== 'idle' ? reading.current : undefined;
 
   const go = (b: number, c: number, focus?: [number, number]) => {
     setPanel(null);
@@ -234,6 +262,8 @@ export function BiblePane({ loc, onNavigate, onInsert, onOpenNote, toast, tabs }
         <ActionIcon onClick={() => step(1)} aria-label="Next chapter" disabled={atEnd}>
           <ChevronRight />
         </ActionIcon>
+        {/* From the first selected verse, if any. */}
+        <ListenButton owner="bible" onStart={() => listen(selected.length ? Math.min(...selected) : 0)} />
         <Tooltip label="Bookmarks & highlights">
           <ActionIcon
             variant={panel?.kind === 'saved' ? 'light' : 'subtle'}
@@ -296,7 +326,13 @@ export function BiblePane({ loc, onNavigate, onInsert, onOpenNote, toast, tabs }
             <p
               key={v.verse}
               data-verse={v.verse}
-              className={['verse', hl && `hl-${hl}`, selected.includes(v.verse) && 'selected', inFlash(v.verse) && 'flash']
+              className={[
+                'verse',
+                hl && `hl-${hl}`,
+                selected.includes(v.verse) && 'selected',
+                inFlash(v.verse) && 'flash',
+                readingVerse === String(v.verse) && 'reading',
+              ]
                 .filter(Boolean)
                 .join(' ')}
               onClick={() =>
@@ -386,6 +422,8 @@ export function BiblePane({ loc, onNavigate, onInsert, onOpenNote, toast, tabs }
           </Group>
         </Paper>
       )}
+
+      {!panel && <PlayerBar owner="bible" title={`${bookById(book).name} ${chapter}`} />}
 
       <BookPicker opened={picking} current={book} onClose={() => setPicking(false)} onPick={(b, c) => (setPicking(false), go(b, c))} />
     </section>
