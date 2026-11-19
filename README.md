@@ -93,6 +93,9 @@ Sync needs a Google OAuth client ID (free). Without one, Settings just says sync
      named `GOOGLE_CLIENT_ID`, then re-run the publish workflow;
    - for local development: a `.env.local` file containing `VITE_GOOGLE_CLIENT_ID=…`.
 
+The consent screen's privacy policy link is `https://hachadwick.github.io/Rubies/privacy.html` (`public/privacy.html`).
+Don't upload a logo there: that requires Google's app verification.
+
 Sign-in uses Google's popup, so it works in browsers and installed web apps but not in the desktop (Electron) app,
 which shows a note instead. Google's sign-in lasts about an hour; after that the cloud icon in the Notes header turns
 yellow and one tap reconnects (changes made meanwhile are kept and sync then).

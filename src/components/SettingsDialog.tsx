@@ -1,4 +1,5 @@
 import {
+  Anchor,
   Button,
   Divider,
   FileButton,
@@ -166,6 +167,11 @@ export function SettingsDialog({ opened, settings, onChange, onClose, toast }: P
         <Section title="About">
           <Text size="sm" c="dimmed">
             Scripture text: King James Version (1769 Oxford edition), public domain in the United States.
+          </Text>
+          <Text size="sm">
+            <Anchor href="https://hachadwick.github.io/Rubies/privacy.html" target="_blank" rel="noopener">
+              Privacy policy
+            </Anchor>
           </Text>
         </Section>
       </Stack>
