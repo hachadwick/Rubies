@@ -9,7 +9,12 @@
 /** The OAuth client ID from Google Cloud Console (set at build time; see README → Sync with Google Drive). */
 export const GOOGLE_CLIENT_ID: string = import.meta.env.VITE_GOOGLE_CLIENT_ID ?? '';
 
-const SCOPES = 'https://www.googleapis.com/auth/drive.appdata openid email profile';
+const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.appdata';
+const SCOPES = `${DRIVE_SCOPE} openid email profile`;
+
+/** Shown when the person signs in but leaves Google's Drive checkbox unticked. */
+export const DRIVE_ACCESS_MESSAGE =
+  'Rubies wasn’t given access to its private folder in your Google Drive, so it can’t sync. Try again and tick the Google Drive box on Google’s screen.';
 const FILE_NAME = 'rubies-sync.json';
 const DRIVE = 'https://www.googleapis.com/drive/v3';
 const UPLOAD = 'https://www.googleapis.com/upload/drive/v3';
@@ -22,6 +27,7 @@ export const syncSupported = () => !!GOOGLE_CLIENT_ID && location.protocol.start
 interface TokenResponse {
   access_token?: string;
   expires_in?: number | string;
+  scope?: string;
   error?: string;
   error_description?: string;
 }
@@ -76,7 +82,7 @@ export interface Token {
  * Asks Google for an access token. Must be called from a tap or click, because it may open Google's popup.
  * `prompt: ''` skips the account chooser and consent screen when the person already agreed before.
  */
-export async function requestToken(opts: { prompt?: '' | 'consent' | 'select_account'; loginHint?: string } = {}): Promise<Token> {
+export async function requestToken(opts: { prompt?: '' | 'consent' | 'select_account' | 'select_account consent'; loginHint?: string } = {}): Promise<Token> {
   const oauth2 = await loadGis();
   return new Promise<Token>((resolve, reject) => {
     const client = oauth2.initTokenClient({
@@ -84,6 +90,10 @@ export async function requestToken(opts: { prompt?: '' | 'consent' | 'select_acc
       scope: SCOPES,
       callback: (r) => {
         if (r.error || !r.access_token) return reject(new Error(r.error_description || r.error || 'Google sign-in failed.'));
+        // Google lets people untick individual permissions; without Drive, sign-in works but syncing can't.
+        if (r.scope !== undefined && !r.scope.split(' ').includes(DRIVE_SCOPE)) {
+          return reject(new GoogleError(DRIVE_ACCESS_MESSAGE, 403, true));
+        }
         resolve({ accessToken: r.access_token, expiresAt: Date.now() + (Number(r.expires_in) || 3600) * 1000 });
       },
       error_callback: (e) =>
@@ -102,11 +112,15 @@ export async function revokeToken(token: string) {
   }
 }
 
-/** A Google request that failed; `status` 401 means the sign-in has expired. */
+/**
+ * A Google request that failed; `status` 401 means the sign-in has expired, and `missingScope` means the person
+ * didn't give Rubies access to Google Drive.
+ */
 export class GoogleError extends Error {
   constructor(
     message: string,
     readonly status: number,
+    readonly missingScope = false,
   ) {
     super(message);
   }
@@ -121,12 +135,16 @@ async function call(token: string, url: string, init: RequestInit = {}): Promise
   }
   if (!res.ok) {
     let msg = `Google Drive error ${res.status}`;
+    let reason = '';
     try {
-      msg = (await res.json())?.error?.message || msg;
+      const err = (await res.json())?.error;
+      msg = err?.message || msg;
+      reason = err?.details?.[0]?.reason || err?.errors?.[0]?.reason || '';
     } catch {
       /* keep the status */
     }
-    throw new GoogleError(msg, res.status);
+    const missingScope = res.status === 403 && (/scope/i.test(msg) || /SCOPE_INSUFFICIENT|insufficientPermissions/i.test(reason));
+    throw new GoogleError(missingScope ? DRIVE_ACCESS_MESSAGE : msg, res.status, missingScope);
   }
   return res;
 }

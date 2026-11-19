@@ -33,6 +33,8 @@ export interface SyncState {
   account?: Profile;
   lastSyncedAt?: number;
   error?: string;
+  /** Paused because Google Drive access wasn't granted; reconnecting must show Google's consent screen again. */
+  needsDriveAccess?: boolean;
 }
 
 const ACCOUNT_KEY = 'rubies.sync';
@@ -170,6 +172,10 @@ async function runSync(): Promise<void> {
     save({ fileId, lastSyncedAt: now });
     set({ status: 'idle', lastSyncedAt: now });
   } catch (e) {
+    if (e instanceof GoogleError && e.missingScope) {
+      setToken(undefined);
+      return set({ status: 'paused', error: undefined, needsDriveAccess: true });
+    }
     if (e instanceof GoogleError && e.status === 401) {
       setToken(undefined);
       return set({ status: 'paused', error: undefined });
@@ -205,12 +211,13 @@ export function syncNow(): Promise<void> {
 export async function signIn(): Promise<void> {
   set({ error: undefined });
   try {
-    const t = await requestToken({ prompt: 'select_account' });
+    // `consent` so Google shows the Drive checkbox again if it was left unticked last time.
+    const t = await requestToken({ prompt: 'select_account consent' });
     const account = await getProfile(t.accessToken);
     if (stored.account && stored.account.email !== account.email) save({ fileId: undefined, lastSyncedAt: undefined });
     setToken(t);
     save({ account });
-    set({ account, status: 'idle', lastSyncedAt: stored.lastSyncedAt });
+    set({ account, status: 'idle', lastSyncedAt: stored.lastSyncedAt, needsDriveAccess: false });
     await syncNow();
   } catch (e) {
     set({ error: (e as Error).message });
@@ -222,12 +229,13 @@ export async function signIn(): Promise<void> {
 export async function reconnect(): Promise<void> {
   set({ error: undefined });
   try {
-    const t = await requestToken({ prompt: '', loginHint: stored.account?.email });
+    const t = await requestToken({ prompt: state.needsDriveAccess ? 'consent' : '', loginHint: stored.account?.email });
     setToken(t);
-    set({ status: 'idle' });
+    set({ status: 'idle', needsDriveAccess: false });
     await syncNow();
   } catch (e) {
-    set({ status: 'paused', error: (e as Error).message });
+    const missing = e instanceof GoogleError && e.missingScope;
+    set({ status: 'paused', error: missing ? undefined : (e as Error).message, needsDriveAccess: missing || state.needsDriveAccess });
     throw e;
   }
 }

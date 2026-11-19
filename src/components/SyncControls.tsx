@@ -1,7 +1,7 @@
 import { ActionIcon, Alert, Avatar, Button, Group, Loader, Stack, Text, Tooltip } from '@mantine/core';
 import { Cloud, CloudAlert, CloudOff, LogOut, RefreshCw } from 'lucide-react';
 import { useState } from 'react';
-import { GOOGLE_CLIENT_ID, syncSupported } from '../sync/google';
+import { DRIVE_ACCESS_MESSAGE, GOOGLE_CLIENT_ID, syncSupported } from '../sync/google';
 import { reconnect, signIn, signOut, syncNow, useSyncState, type SyncState } from '../sync/sync';
 import { timeAgo } from '../review';
 
@@ -22,6 +22,8 @@ function statusText(s: SyncState): string {
     case 'syncing':
       return 'Syncing…';
     case 'paused':
+      if (s.needsDriveAccess) return DRIVE_ACCESS_MESSAGE;
+      if (s.error) return `Sync paused: ${s.error}`;
       return 'Sync paused: Google sign-in ran out. Reconnect to carry on; your changes are kept on this device.';
     case 'offline':
       return 'Offline. Changes will sync when the internet is back.';
@@ -105,7 +107,7 @@ export function SyncSettings() {
       <Group grow>
         {s.status === 'paused' ? (
           <Button variant="light" leftSection={<GoogleG />} onClick={run(reconnect)} loading={busy}>
-            Reconnect
+            {s.needsDriveAccess ? 'Allow Drive access' : 'Reconnect'}
           </Button>
         ) : (
           <Button variant="light" leftSection={<RefreshCw size={18} />} onClick={run(syncNow)} loading={busy || s.status === 'syncing'}>
@@ -138,7 +140,8 @@ export function SyncButton({ onOpenSettings }: { onOpenSettings: () => void }) {
     ) : (
       <Cloud />
     );
-  const label = s.status === 'paused' ? 'Sync paused. Tap to reconnect.' : statusText(s);
+  const label =
+    s.status === 'paused' ? (s.needsDriveAccess ? 'Sync paused: Rubies needs Google Drive access.' : 'Sync paused. Tap to reconnect.') : statusText(s);
 
   return (
     <Tooltip label={label} multiline maw={260}>
@@ -146,7 +149,8 @@ export function SyncButton({ onOpenSettings }: { onOpenSettings: () => void }) {
         aria-label={label}
         color={s.status === 'paused' ? 'yellow' : s.status === 'error' ? 'red' : undefined}
         onClick={() => {
-          if (s.status === 'paused') reconnect().catch(onOpenSettings);
+          if (s.status === 'paused' && s.needsDriveAccess) onOpenSettings();
+          else if (s.status === 'paused') reconnect().catch(onOpenSettings);
           else if (s.status === 'error') onOpenSettings();
           else syncNow();
         }}
