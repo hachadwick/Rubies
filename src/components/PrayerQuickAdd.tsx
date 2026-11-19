@@ -1,5 +1,6 @@
 import { ActionIcon, Anchor, Button, Chip, Group, Popover, Stack, Text, TextInput, Textarea, Tooltip } from '@mantine/core';
 import { Flame } from 'lucide-react';
+import { FireFlame } from './FireFlame';
 import { useEffect, useRef, useState } from 'react';
 import { addPrayer, FOLLOW_UPS, inDays } from '../prayer';
 
@@ -54,7 +55,7 @@ export function PrayerQuickAdd({ noteId, getNoteTitle, getSelection, onOpenList,
       <Popover.Target>
         <Tooltip label="Add to prayer list (Ctrl+Shift+P)" disabled={opened}>
           <ActionIcon onClick={() => (opened ? setOpened(false) : open())} aria-label="Add to prayer list" aria-expanded={opened}>
-            <Flame />
+            <FireFlame />
           </ActionIcon>
         </Tooltip>
       </Popover.Target>

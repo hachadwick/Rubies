@@ -75,14 +75,21 @@ h2 {
   display: grid;
   padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left);
 }
-/* Side by side: the Bible takes --split of the width (set by dragging the handle between them), the notes the rest. */
+/*
+ * Side by side: the Bible takes --split of the width (set by dragging the handle between them), the notes the rest.
+ * Neither pane may get narrower than its own header needs (min-content), so on a tablet the chapter picker and the
+ * buttons never get squashed or covered, even after rotating or opening a note with a busier header.
+ */
 .app.wide {
   --split: 48.8%;
-  grid-template-columns: minmax(0, var(--split)) 9px minmax(0, 1fr);
+  grid-template-columns: minmax(min-content, var(--split)) 9px minmax(min-content, 1fr);
   grid-template-rows: minmax(0, 1fr);
 }
 
 /* The divider: a thin line with a grip in the middle, easy to grab (the whole 9px strip, and a little more). */
+.app.wide > .pane {
+  min-width: 320px; /* matches MIN_PX in SplitHandle.tsx */
+}
 .split-handle {
   position: relative;
   z-index: 5;
@@ -162,9 +169,14 @@ h2 {
   gap: 4px;
   min-height: 60px;
   padding: 8px 10px;
+  white-space: nowrap;
   border-bottom: 1px solid var(--border);
   background: var(--head-bg);
   backdrop-filter: saturate(1.6) blur(12px);
+}
+/* Header controls keep their size; the pane gets wider instead (see .app.wide). */
+.pane-head > :not(.spacer) {
+  flex-shrink: 0;
 }
 .ref-btn {
   font-size: 20px;

@@ -6,7 +6,8 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
+      // A new version waits until the person taps the update button in the notes header (see src/update.ts).
+      registerType: 'prompt',
       includeAssets: ['icon.svg'],
       workbox: {
         // The KJV text (~4.5 MB) is precached so the Bible works fully offline.

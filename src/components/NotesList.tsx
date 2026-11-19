@@ -15,11 +15,13 @@ import {
   UnstyledButton,
 } from '@mantine/core';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Flame, History, NotebookPen, Plus, Search, Settings } from 'lucide-react';
+import { History, NotebookPen, Plus, Search, Settings } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { db, hasSpeaker, kindLabel, newNote, NOTE_KINDS, type Note, type NoteKind } from '../db';
 import { todayIso } from '../prayer';
+import { FireFlame } from './FireFlame';
 import { SyncButton } from './SyncControls';
+import { UpdateButton } from './UpdateButton';
 import { intervalLabel, isStale, reviewedAt, timeAgo } from '../review';
 import { formatDate, noteTitle } from '../util';
 
@@ -145,10 +147,11 @@ export function NotesList({ onOpen, onSettings, onPrayers, reviewEveryDays }: Pr
         <Tooltip label={dueCount ? `Prayer list · ${dueCount} to follow up` : 'Prayer list'}>
           <Indicator label={dueCount} size={18} color="red" disabled={!dueCount} offset={6}>
             <ActionIcon onClick={onPrayers} aria-label={dueCount ? `Prayer list, ${dueCount} to follow up` : 'Prayer list'}>
-              <Flame />
+              <FireFlame />
             </ActionIcon>
           </Indicator>
         </Tooltip>
+        <UpdateButton />
         <SyncButton onOpenSettings={onSettings} />
         <ActionIcon onClick={onSettings} aria-label="Settings">
           <Settings />

@@ -3,6 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { BellRing, CalendarClock, Check, Flame, NotebookPen, RotateCcw, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { db, type Prayer } from '../db';
+import { FireFlame } from './FireFlame';
 import { addPrayer, FOLLOW_UPS, inDays, isDue, relativeDay, todayIso, updatePrayer } from '../prayer';
 import { formatDate } from '../util';
 import { ConfirmDialog } from './ConfirmDialog';
@@ -52,7 +53,7 @@ export function PrayerList({ opened, onClose, onOpenNote }: Props) {
       padding="lg"
       title={
         <Group gap="xs">
-          <Flame size={22} />
+          <FireFlame size={22} />
           <Title order={3}>Prayer list</Title>
         </Group>
       }

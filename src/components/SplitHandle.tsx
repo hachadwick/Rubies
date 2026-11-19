@@ -30,10 +30,29 @@ export function useSplit() {
   return { split, setSplit, style: { '--split': `${split}%` } as CSSProperties };
 }
 
-/** Keeps both panes at least MIN_PX wide (and MIN_PCT of the width) in a container this wide. */
-function clamp(pct: number, width: number): number {
-  const minPct = Math.max(MIN_PCT, width ? (MIN_PX / width) * 100 : 0);
-  return Math.min(Math.max(pct, minPct), 100 - minPct);
+/** How narrow a pane can get before its header (chapter picker, buttons) would be squashed: its min-content width. */
+function minWidth(pane: Element | null | undefined): number {
+  if (!(pane instanceof HTMLElement)) return 0;
+  const old = pane.style.width;
+  pane.style.width = 'min-content';
+  const w = pane.getBoundingClientRect().width;
+  pane.style.width = old;
+  return w;
+}
+
+/**
+ * Keeps each pane at least MIN_PX wide (and MIN_PCT of the width), and never narrower than its header needs, in the
+ * container `handle` sits in. The stylesheet enforces the header minimum too, for rotation and window resizes.
+ */
+function clamp(pct: number, handle: HTMLElement): number {
+  const box = handle.parentElement?.getBoundingClientRect();
+  const width = box?.width ?? 0;
+  if (!width) return Math.min(Math.max(pct, MIN_PCT), 100 - MIN_PCT);
+  const floor = Math.max((MIN_PCT / 100) * width, MIN_PX);
+  const minLeft = (Math.max(floor, minWidth(handle.previousElementSibling)) / width) * 100;
+  const minRight = (Math.max(floor, minWidth(handle.nextElementSibling)) / width) * 100;
+  if (minLeft + minRight > 100) return (minLeft / (minLeft + minRight)) * 100; // no room: share it fairly
+  return Math.min(Math.max(pct, minLeft), 100 - minRight);
 }
 
 /**
@@ -56,7 +75,7 @@ export function SplitHandle({ split, onChange }: { split: number; onChange: (pct
     if (!dragging) return;
     const box = containerWidth(e.currentTarget);
     if (!box?.width) return;
-    onChange(clamp(((e.clientX - box.left) / box.width) * 100, box.width));
+    onChange(clamp(((e.clientX - box.left) / box.width) * 100, e.currentTarget));
   };
 
   const stop = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -66,7 +85,6 @@ export function SplitHandle({ split, onChange }: { split: number; onChange: (pct
   };
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
-    const width = containerWidth(e.currentTarget)?.width ?? 0;
     const step = e.shiftKey ? 10 : 2;
     const next =
       e.key === 'ArrowLeft' ? split - step
@@ -77,7 +95,7 @@ export function SplitHandle({ split, onChange }: { split: number; onChange: (pct
       : null;
     if (next === null) return;
     e.preventDefault();
-    onChange(clamp(next, width));
+    onChange(clamp(next, e.currentTarget));
   };
 
   return (
