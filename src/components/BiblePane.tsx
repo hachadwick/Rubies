@@ -429,7 +429,7 @@ function ResultRow({
   return (
     <li>
       <UnstyledButton className="result" onClick={onClick}>
-        <Text component="span" size="xs" fw={700} c="var(--mantine-primary-color-filled)" tt="uppercase" className="result-ref">
+        <Text component="span" size="xs" fw={700} c="var(--accent)" tt="uppercase" className="result-ref">
           {label}
         </Text>
         <span className="result-text">{children}</span>

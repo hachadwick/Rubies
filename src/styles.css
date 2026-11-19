@@ -28,6 +28,8 @@
   --hl-orange-solid: #fb923c;
 }
 [data-mantine-color-scheme='dark'] {
+  /* Filled buttons are deep ruby in dark mode (see theme.ts); accent text stays a readable pink. */
+  --accent: var(--mantine-color-ruby-4);
   --soft: var(--mantine-color-dark-6);
   --rule: #2c323b;
   --hl-yellow: rgb(250 204 21 / 0.28);

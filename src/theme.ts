@@ -1,4 +1,16 @@
-import { ActionIcon, Button, Modal, Paper, SegmentedControl, TextInput, createTheme, type MantineColorsTuple } from '@mantine/core';
+import {
+  ActionIcon,
+  Button,
+  Loader,
+  Modal,
+  Radio,
+  Paper,
+  SegmentedControl,
+  TextInput,
+  createTheme,
+  type CSSVariablesResolver,
+  type MantineColorsTuple,
+} from '@mantine/core';
 
 const ruby: MantineColorsTuple = [
   '#fdeef2',
@@ -23,11 +35,42 @@ export const theme = createTheme({
   cursorType: 'pointer',
   components: {
     ActionIcon: ActionIcon.extend({ defaultProps: { variant: 'subtle', color: 'gray', size: 'xl', radius: 'md' } }),
-    Button: Button.extend({ defaultProps: { radius: 'md' } }),
+    Button: Button.extend({
+      defaultProps: { radius: 'md' },
+      // Filled ruby buttons get pale pink text in dark mode, like the soft icons (white in light mode).
+      vars: (_theme, props) =>
+        (props.variant ?? 'filled') === 'filled' && (!props.color || props.color === 'ruby')
+          ? { root: { '--button-color': 'var(--rubies-on-filled)' } }
+          : { root: {} },
+    }),
     TextInput: TextInput.extend({ defaultProps: { radius: 'md' } }),
     SegmentedControl: SegmentedControl.extend({ defaultProps: { radius: 'md' } }),
     Modal: Modal.extend({ defaultProps: { radius: 'lg', centered: true, overlayProps: { blur: 3, backgroundOpacity: 0.35 } } }),
     Paper: Paper.extend({ defaultProps: { radius: 'lg' } }),
+    Loader: Loader.extend({ defaultProps: { color: 'var(--accent)' } }),
+    // Radio dots stay the readable accent pink in dark mode, rather than the deep ruby of filled buttons.
+    Radio: Radio.extend({ vars: () => ({ root: { '--radio-color': 'var(--accent)' } }) }),
+  },
+});
+
+/**
+ * In dark mode, filled buttons (New note, Add, Mark as reviewed…) use the same deep ruby with pale pink text as the
+ * soft "light" style, instead of bright pink. Accent text (verse numbers, references) stays pink via --accent.
+ */
+const DEEP_RUBY = '#460f20';
+const DEEP_RUBY_HOVER = '#5c1529';
+const PALE_PINK = '#fdeef2';
+export const cssVariablesResolver: CSSVariablesResolver = () => ({
+  variables: {},
+  light: { '--rubies-on-filled': '#fff' },
+  dark: {
+    '--rubies-on-filled': PALE_PINK,
+    '--mantine-primary-color-filled': DEEP_RUBY,
+    '--mantine-primary-color-filled-hover': DEEP_RUBY_HOVER,
+    '--mantine-primary-color-contrast': PALE_PINK,
+    '--mantine-color-ruby-filled': DEEP_RUBY,
+    '--mantine-color-ruby-filled-hover': DEEP_RUBY_HOVER,
+    '--mantine-color-ruby-contrast': PALE_PINK,
   },
 });
 
