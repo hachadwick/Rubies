@@ -21,6 +21,7 @@ import { db, hasSpeaker, kindLabel, newNote, NOTE_KINDS, type Note, type NoteKin
 import { todayIso } from '../prayer';
 import { FireFlame } from './FireFlame';
 import { SyncButton } from './SyncControls';
+import { InstallButton } from './InstallButton';
 import { UpdateButton } from './UpdateButton';
 import { intervalLabel, isStale, reviewedAt, timeAgo } from '../review';
 import { formatDate, noteTitle } from '../util';
@@ -152,6 +153,7 @@ export function NotesList({ onOpen, onSettings, onPrayers, reviewEveryDays }: Pr
           </Indicator>
         </Tooltip>
         <UpdateButton />
+        <InstallButton variant="header" />
         <SyncButton onOpenSettings={onSettings} />
         <ActionIcon onClick={onSettings} aria-label="Settings">
           <Settings />

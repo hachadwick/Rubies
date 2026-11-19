@@ -11,9 +11,11 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
 import { cssVariablesResolver, theme } from './theme';
+import { startInstall } from './install';
 import { startUpdates } from './update';
 
 startUpdates();
+startInstall();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

@@ -17,10 +17,12 @@ import {
 import { Download, Monitor, Moon, Sun, Upload } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { exportBackup, importBackup } from '../db';
+import { useInstall } from '../install';
 import { REVIEW_CHOICES } from '../review';
 import type { Settings } from '../settings';
 import { SERIF } from '../theme';
 import { saveFile } from '../util';
+import { InstallButton } from './InstallButton';
 import { SyncSettings } from './SyncControls';
 
 interface Props {
@@ -51,6 +53,7 @@ const iconLabel = (Icon: typeof Sun, label: string) => (
 
 export function SettingsDialog({ opened, settings, onChange, onClose, toast }: Props) {
   const { colorScheme, setColorScheme } = useMantineColorScheme();
+  const { installed } = useInstall();
   const [persisted, setPersisted] = useState<boolean | null>(null);
 
   useEffect(() => {
@@ -157,11 +160,18 @@ export function SettingsDialog({ opened, settings, onChange, onClose, toast }: P
         <Divider />
 
         <Section title="Install">
-          <Text size="sm" c="dimmed">
-            <b>iPad:</b> in Safari tap Share → Add to Home Screen. <b>Android:</b> Chrome menu → Install app.{' '}
-            <b>Windows / Mac:</b> the install icon in the Chrome or Edge address bar. Once installed, Rubies works with no
-            internet connection.
-          </Text>
+          {installed ? (
+            <Text size="sm" c="dimmed">
+              Rubies is installed on this device and works with no internet connection.
+            </Text>
+          ) : (
+            <>
+              <Text size="sm" c="dimmed">
+                Install Rubies to open it like any other app, in its own window, with no internet connection needed.
+              </Text>
+              <InstallButton variant="settings" />
+            </>
+          )}
         </Section>
 
         <Section title="About">
