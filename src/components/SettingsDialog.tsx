@@ -5,6 +5,7 @@ import {
   Group,
   Modal,
   SegmentedControl,
+  Select,
   Slider,
   Stack,
   Text,
@@ -15,6 +16,7 @@ import {
 import { Download, Monitor, Moon, Sun, Upload } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { exportBackup, importBackup } from '../db';
+import { REVIEW_CHOICES } from '../review';
 import type { Settings } from '../settings';
 import { SERIF } from '../theme';
 import { saveFile } from '../util';
@@ -106,6 +108,19 @@ export function SettingsDialog({ opened, settings, onChange, onClose, toast }: P
             value={settings.noteFontSize}
             onChange={(v) => onChange({ noteFontSize: v })}
             label={(v) => `${v}px`}
+          />
+        </Section>
+
+        <Divider />
+
+        <Section title="Reviewing notes">
+          <Select
+            label="Remind me to review a note"
+            description="A note that hasn't been marked reviewed in this long is suggested for review on the notes list."
+            data={REVIEW_CHOICES}
+            value={String(settings.reviewEveryDays)}
+            onChange={(v) => v !== null && onChange({ reviewEveryDays: Number(v) })}
+            allowDeselect={false}
           />
         </Section>
 

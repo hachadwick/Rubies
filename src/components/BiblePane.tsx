@@ -34,7 +34,7 @@ import { bookById } from '../bible/books';
 import { chapterCount, getChapter, getPassage, searchBible, type SearchResult } from '../bible/kjv';
 import { formatRef, parseKey, parseRefs, type Ref, verseKey } from '../bible/reference';
 import { db, type HighlightColor, type Note } from '../db';
-import { noteTitle } from '../util';
+import { copyText, noteTitle } from '../util';
 import { BookPicker } from './BookPicker';
 
 export interface BibleLocation {
@@ -198,7 +198,7 @@ export function BiblePane({ loc, onNavigate, onInsert, onOpenNote, toast }: Prop
 
   const copy = async () => {
     try {
-      await navigator.clipboard.writeText(passageText(refs));
+      await copyText(passageText(refs));
       toast(`Copied ${refsLabel(refs)}`);
     } catch {
       toast('Copy failed');

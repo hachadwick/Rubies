@@ -11,9 +11,9 @@ import {
   type IParagraphOptions,
   type IRunOptions,
 } from 'docx';
-import { kindLabel, type Note } from './db';
+import { hasSpeaker, kindLabel, type Note } from './db';
 import { renderInkImages, type InkImage } from './ink';
-import { escapeHtml, formatDate, noteTitle, safeFileName } from './util';
+import { copyText, escapeHtml, formatDate, noteTitle, quoteParts, safeFileName } from './util';
 
 /** Present only in the desktop (Electron) app; see electron/preload.cjs. */
 declare global {
@@ -29,7 +29,8 @@ const ACCENT = '8B1E3F';
 
 /** "Sermon · Wednesday, November 18, 2026 · Darren Verbout · Cabot, Arkansas" */
 export function noteMetaParts(n: Note): string[] {
-  return [kindLabel(n.kind), formatDate(n.date, { dateStyle: 'full' }), n.speaker.trim(), n.church.trim()].filter(Boolean);
+  const who = hasSpeaker(n.kind) ? [n.speaker.trim(), n.church.trim()] : [];
+  return [kindLabel(n.kind), formatDate(n.date, { dateStyle: 'full' }), ...who].filter(Boolean);
 }
 
 export function noteFileBase(n: Note): string {
@@ -134,8 +135,33 @@ function blocks(node: Node, ctx: BlockCtx): Paragraph[] {
           heading: node.tagName === 'H1' ? HeadingLevel.HEADING_1 : node.tagName === 'H2' ? HeadingLevel.HEADING_2 : HeadingLevel.HEADING_3,
         }),
       ];
-    case 'BLOCKQUOTE':
-      return [...node.childNodes].flatMap((c) => blocks(c, { ...ctx, quote: true }));
+    case 'BLOCKQUOTE': {
+      // “The quoted words” in quotation marks, then — Who said them, right-aligned underneath.
+      const inQuote = { ...ctx, quote: true };
+      const { lead, body, cite } = quoteParts(node);
+      const mark = (text: string) => new TextRun({ text, bold: true, color: ACCENT });
+      const paras = body.flatMap((c, i) => {
+        if (!(c instanceof HTMLElement && c.tagName === 'P')) return blocks(c, inQuote);
+        const runs = inlineRuns(c);
+        return [
+          new Paragraph({
+            children: [...(i === 0 ? [mark('“')] : []), ...runs, ...(i === body.length - 1 ? [mark('”')] : [])],
+            spacing: { after: 120 },
+            ...quoteStyle(true),
+          }),
+        ];
+      });
+      const citePara = cite
+        ? [
+            new Paragraph({
+              alignment: AlignmentType.RIGHT,
+              children: [new TextRun({ text: `— ${cite}`, bold: true, color: '666666', size: 20 })],
+              ...quoteStyle(true),
+            }),
+          ]
+        : [];
+      return [...(lead ? blocks(lead, inQuote) : []), ...paras, ...citePara];
+    }
     case 'UL':
     case 'OL':
       return listItems(node, ctx, 0);
@@ -269,6 +295,13 @@ export function noteToPrintHtml(n: Note, ink: InkImage[]): string {
     font-family: Georgia, 'Times New Roman', serif; break-inside: avoid; }
   blockquote p { margin: 2pt 0; }
   blockquote strong { color: #${ACCENT}; font-family: 'Segoe UI', system-ui, sans-serif; font-size: 0.85em; }
+  blockquote > p:first-child:not(:has(> strong:only-child))::before,
+  blockquote > p:first-child:has(> strong:only-child) + p::before { content: '\\201C'; color: #${ACCENT}; font-weight: 700; }
+  blockquote > p:has(+ cite)::after, blockquote > p:last-child::after { content: '\\201D'; color: #${ACCENT}; font-weight: 700; }
+  blockquote > cite { display: block; margin-top: 3pt; text-align: right; font: 600 10pt 'Segoe UI', system-ui, sans-serif; color: #666; }
+  blockquote > cite::before { content: '\\2014\\00A0'; }
+  blockquote > cite:empty { display: none; }
+  blockquote > p:has(+ cite:empty)::after { content: '\\201D'; }
   mark { background: #fde68a; }
   img.ink { display: block; width: 100%; margin: 0 0 8pt; break-inside: avoid; }
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
@@ -332,5 +365,5 @@ export async function emailNote(n: Note): Promise<void> {
 }
 
 export async function copyNote(n: Note): Promise<void> {
-  await navigator.clipboard.writeText(noteToText(n));
+  await copyText(noteToText(n));
 }

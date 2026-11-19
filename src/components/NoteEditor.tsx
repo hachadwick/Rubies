@@ -1,18 +1,15 @@
 import {
   ActionIcon,
-  Blockquote,
   Button,
   Center,
   Group,
   Loader,
   Menu,
-  Modal,
   Radio,
   SegmentedControl,
   Stack,
   Text,
   TextInput,
-  Title,
   Tooltip,
   type TextInputProps,
 } from '@mantine/core';
@@ -20,15 +17,20 @@ import { RichTextEditor } from '@mantine/tiptap';
 import Highlight from '@tiptap/extension-highlight';
 import { useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
-import { ArrowLeft, BookOpen, Check, Copy, FileDown, FileText, Loader2, Mail, PenLine, Share, Share2, Trash2, Type } from 'lucide-react';
+import { ArrowLeft, CalendarCheck, Check, History, Copy, FileDown, FileText, Loader2, Mail, PenLine, Share, Share2, Trash2, Type } from 'lucide-react';
 import { canShare, copyNote, emailNote, exportPdf, exportWord, shareNote } from '../exporting';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getPassage, refKeys } from '../bible/kjv';
 import { extractRefs, formatRef, parseRefs, type Ref } from '../bible/reference';
-import { db, NOTE_KINDS, type InkStroke, type Note, type NoteKind } from '../db';
+import { db, hasSpeaker, NOTE_KINDS, type InkStroke, type Note, type NoteKind } from '../db';
 import { escapeHtml, noteTitle } from '../util';
 import { refsLabel } from './BiblePane';
 import { InkPad } from './InkPad';
+import { ConfirmDialog } from './ConfirmDialog';
+import { PrayerQuickAdd } from './PrayerQuickAdd';
+import { SERIF } from '../theme';
+import { Quote, QuoteCite } from '../quote';
+import { isStale, reviewedAt, timeAgo } from '../review';
 
 interface Props {
   noteId: string;
@@ -36,6 +38,10 @@ interface Props {
   /** Lets the Bible pane insert verses into this note while it is open. */
   registerInserter: (fn: ((refs: Ref[]) => void) | null) => void;
   toast: (msg: string) => void;
+  /** Opens the prayer list over the note. */
+  onOpenPrayers: () => void;
+  /** The review interval from Settings (0 = no review reminders). */
+  reviewEveryDays: number;
 }
 
 export function NoteEditor(props: Props) {
@@ -82,7 +88,8 @@ function passageHtml(refs: Ref[]): string {
         const body = vs
           .map((v) => (vs.length > 1 ? `<strong>${v.verse}</strong> ${escapeHtml(v.text)}` : escapeHtml(v.text)))
           .join(' ');
-        return `<blockquote><p><strong>${formatRef(r)} (KJV)</strong></p><p>${body}</p></blockquote>`;
+        // The passage, with its reference as the quote's name line: “…” — John 3:16 (KJV)
+        return `<blockquote><p>${body}</p><cite>${formatRef(r)} (KJV)</cite></blockquote>`;
       })
       .join('') + '<p></p>'
   );
@@ -113,7 +120,8 @@ function FloatInput({ alwaysFloat, onFocus, onBlur, ...props }: TextInputProps &
   );
 }
 
-function Editor_({ initial, onBack, registerInserter, toast }: Props & { initial: Note }) {
+function Editor_({ initial, onBack, registerInserter, toast, onOpenPrayers, reviewEveryDays }: Props & { initial: Note }) {
+  const [lastReviewedAt, setLastReviewedAt] = useState(initial.lastReviewedAt);
   const [meta, setMeta] = useState(() => ({
     title: initial.title,
     date: initial.date,
@@ -122,8 +130,8 @@ function Editor_({ initial, onBack, registerInserter, toast }: Props & { initial
   }));
   const [kind, setKind] = useState<NoteKind>(initial.kind ?? 'sermon');
   const [mode, setMode] = useState<'type' | 'write'>(initial.ink.length && !initial.bodyText.trim() ? 'write' : 'type');
-  const [lookupOpen, setLookupOpen] = useState(false);
   const [saved, setSaved] = useState(true);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [suggest, setSuggest] = useState<{ speakers: string[]; churches: string[] }>({ speakers: [], churches: [] });
 
   const noteRef = useRef<Note>(initial);
@@ -172,7 +180,7 @@ function Editor_({ initial, onBack, registerInserter, toast }: Props & { initial
   }, [flush]);
 
   const editor = useEditor({
-    extensions: [StarterKit, Highlight],
+    extensions: [StarterKit.configure({ blockquote: false }), Quote, QuoteCite, Highlight],
     content: initial.bodyHtml,
     editorProps: { attributes: { class: 'prose', 'aria-label': 'Sermon notes' } },
     onUpdate: ({ editor }) => patch({ bodyHtml: editor.getHTML(), bodyText: editor.getText({ blockSeparator: '\n' }) }),
@@ -205,7 +213,6 @@ function Editor_({ initial, onBack, registerInserter, toast }: Props & { initial
   };
 
   const remove = async () => {
-    if (!confirm(`Delete “${noteTitle(noteRef.current)}”? This cannot be undone.`)) return;
     window.clearTimeout(timer.current);
     timer.current = undefined;
     await db.notes.delete(noteRef.current.id);
@@ -251,12 +258,34 @@ function Editor_({ initial, onBack, registerInserter, toast }: Props & { initial
           ]}
         />
         <div className="spacer" />
+        <PrayerQuickAdd
+          noteId={initial.id}
+          getNoteTitle={() => noteTitle(noteRef.current)}
+          getSelection={() => {
+            const sel = editor?.state.selection;
+            return sel && !sel.empty ? editor.state.doc.textBetween(sel.from, sel.to, ' ') : '';
+          }}
+          onOpenList={onOpenPrayers}
+          toast={toast}
+        />
         <ExportMenu getNote={async () => (await flush(), noteRef.current)} toast={toast} />
         <Tooltip label="Delete note">
-          <ActionIcon color="red" onClick={remove} aria-label="Delete note">
+          <ActionIcon color="red" onClick={() => setConfirmDelete(true)} aria-label="Delete note">
             <Trash2 />
           </ActionIcon>
         </Tooltip>
+        <ConfirmDialog
+          opened={confirmDelete}
+          onClose={() => setConfirmDelete(false)}
+          onConfirm={remove}
+          title="Delete this note?"
+          confirmLabel="Delete note"
+        >
+          <Text fw={600} c="var(--mantine-color-text)" style={{ fontFamily: SERIF }} mb={4}>
+            {noteTitle(noteRef.current)}
+          </Text>
+          It will be removed from this device for good. This can’t be undone.
+        </ConfirmDialog>
       </header>
 
       <div className="meta">
@@ -284,15 +313,21 @@ function Editor_({ initial, onBack, registerInserter, toast }: Props & { initial
             ))}
           </Group>
         </Radio.Group>
-        <div className="meta-grid">
+        {/* Personal study is on your own: just a date, no speaker or location (any already typed are kept, hidden,
+            in case the type is changed back). */}
+        <div className={`meta-grid ${hasSpeaker(kind) ? '' : 'only-date'}`}>
           <FloatInput label="Date" type="date" alwaysFloat value={meta.date} onChange={(e) => setField('date', e.currentTarget.value)} />
-          <FloatInput
-            label="Speaker"
-            value={meta.speaker}
-            onChange={(e) => setField('speaker', e.currentTarget.value)}
-            list="speakers"
-          />
-          <FloatInput label="Location" value={meta.church} onChange={(e) => setField('church', e.currentTarget.value)} list="churches" />
+          {hasSpeaker(kind) && (
+            <>
+              <FloatInput
+                label="Speaker"
+                value={meta.speaker}
+                onChange={(e) => setField('speaker', e.currentTarget.value)}
+                list="speakers"
+              />
+              <FloatInput label="Location" value={meta.church} onChange={(e) => setField('church', e.currentTarget.value)} list="churches" />
+            </>
+          )}
         </div>
         <datalist id="speakers">
           {suggest.speakers.map((s) => (
@@ -304,6 +339,16 @@ function Editor_({ initial, onBack, registerInserter, toast }: Props & { initial
             <option key={s} value={s} />
           ))}
         </datalist>
+        <ReviewLine
+          note={{ ...noteRef.current, lastReviewedAt }}
+          everyDays={reviewEveryDays}
+          onReviewed={() => {
+            const now = Date.now();
+            setLastReviewedAt(now);
+            patch({ lastReviewedAt: now });
+            toast('Marked as reviewed');
+          }}
+        />
       </div>
 
       {mode === 'type' ? (
@@ -325,15 +370,6 @@ function Editor_({ initial, onBack, registerInserter, toast }: Props & { initial
               <RichTextEditor.Undo />
               <RichTextEditor.Redo />
             </RichTextEditor.ControlsGroup>
-            <Button
-              size="compact-md"
-              ml="auto"
-              leftSection={<BookOpen size={16} />}
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => setLookupOpen(true)}
-            >
-              Insert verse
-            </Button>
           </RichTextEditor.Toolbar>
           <div className="editor-scroll" onClick={(e) => e.target === e.currentTarget && editor?.commands.focus('end')}>
             <RichTextEditor.Content />
@@ -342,16 +378,45 @@ function Editor_({ initial, onBack, registerInserter, toast }: Props & { initial
       ) : (
         <InkPad initial={initial.ink} onChange={(ink: InkStroke[]) => patch({ ink })} />
       )}
-
-      <VerseLookup
-        opened={lookupOpen}
-        onClose={() => setLookupOpen(false)}
-        onInsert={(refs) => {
-          setLookupOpen(false);
-          insert(refs);
-        }}
-      />
     </section>
+  );
+}
+
+/**
+ * When the note was last reviewed, with a button to mark it reviewed now. A stale note gets a highlighted bar
+ * ("It's been 4 months since you reviewed this note").
+ */
+function ReviewLine({ note, everyDays, onReviewed }: { note: Note; everyDays: number; onReviewed: () => void }) {
+  const stale = isStale(note, everyDays);
+  const when = reviewedAt(note);
+  const reviewedToday = !!note.lastReviewedAt && timeAgo(note.lastReviewedAt) === 'today';
+  return (
+    <Group className={`review-line ${stale ? 'is-stale' : ''}`} gap="xs" wrap="wrap" justify="space-between" mt="xs" role="status">
+      <Group gap={6} wrap="nowrap" c={stale ? undefined : 'dimmed'}>
+        {stale ? <History size={16} /> : <CalendarCheck size={16} />}
+        <Text size="sm" inherit fw={stale ? 600 : undefined}>
+          {stale
+            ? note.lastReviewedAt
+              ? `It's been ${timeAgo(when).replace(/ ago$/, '')} since you reviewed this note`
+              : `You haven't reviewed this note since it was written ${timeAgo(when)}`
+            : note.lastReviewedAt
+              ? `Last reviewed ${timeAgo(when)} (${new Date(when).toLocaleDateString(undefined, { dateStyle: 'medium' })})`
+              : 'Not reviewed yet'}
+        </Text>
+      </Group>
+      {reviewedToday ? (
+        <Group gap={4} c="teal" wrap="nowrap">
+          <Check size={16} />
+          <Text size="sm" inherit fw={600}>
+            Reviewed today
+          </Text>
+        </Group>
+      ) : (
+        <Button size="compact-sm" variant={stale ? 'filled' : 'light'} leftSection={<CalendarCheck size={14} />} onClick={onReviewed}>
+          Mark as reviewed
+        </Button>
+      )}
+    </Group>
   );
 }
 
@@ -410,70 +475,5 @@ function ExportMenu({ getNote, toast }: { getNote: () => Promise<Note>; toast: (
         </Menu.Item>
       </Menu.Dropdown>
     </Menu>
-  );
-}
-
-function VerseLookup({ opened, onClose, onInsert }: { opened: boolean; onClose: () => void; onInsert: (refs: Ref[]) => void }) {
-  const [q, setQ] = useState('');
-  const refs = parseRefs(q).filter((r) => r.verse !== undefined || r.endChapter === undefined);
-  const verses = refs.flatMap((r) => getPassage(r));
-  const tooLong = verses.length > 60;
-  const ok = verses.length > 0 && !tooLong;
-
-  const close = () => {
-    setQ('');
-    onClose();
-  };
-
-  return (
-    <Modal opened={opened} onClose={close} title={<Title order={3}>Insert verse</Title>} size="lg">
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (ok) {
-            setQ('');
-            onInsert(refs);
-          }
-        }}
-      >
-        <Stack>
-          <TextInput
-            data-autofocus
-            size="lg"
-            value={q}
-            onChange={(e) => setQ(e.currentTarget.value)}
-            placeholder="John 3:16-18; Rom 5:8"
-            aria-label="Verse reference"
-            autoCapitalize="words"
-            autoCorrect="off"
-            enterKeyHint="done"
-            leftSection={<BookOpen size={20} />}
-          />
-          <div className="preview">
-            {q.trim() && !verses.length && <Text c="dimmed">Type a reference like “Ps 23” or “1 Cor 13:4-7”.</Text>}
-            {tooLong && <Text c="dimmed">That’s {verses.length} verses — pick a shorter passage (up to 60).</Text>}
-            {ok &&
-              refs.map((r) => (
-                <Blockquote key={formatRef(r)} cite={`— ${formatRef(r)} (KJV)`} p="md" mb="sm" radius="md" iconSize={0}>
-                  {getPassage(r).map((v) => (
-                    <span key={v.key}>
-                      <sup>{v.verse}</sup>
-                      {v.text}{' '}
-                    </span>
-                  ))}
-                </Blockquote>
-              ))}
-          </div>
-          <Group justify="flex-end">
-            <Button variant="default" onClick={close}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={!ok}>
-              Insert
-            </Button>
-          </Group>
-        </Stack>
-      </form>
-    </Modal>
   );
 }

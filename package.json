@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -p tsconfig.json && vite build",
+    "build:web": "tsc -p tsconfig.json && vite build --base /Rubies/ --outDir dist-web",
+    "preview:web": "vite preview --base /Rubies/ --outDir dist-web",
     "preview": "vite preview",
     "test": "vitest run",
     "build:bible": "node scripts/build-kjv.mjs",
@@ -20,6 +22,8 @@
     "@mantine/hooks": "^9.8.1",
     "@mantine/notifications": "^9.8.1",
     "@mantine/tiptap": "^9.8.1",
+    "@tiptap/core": "^3.34.0",
+    "@tiptap/extension-blockquote": "^3.34.0",
     "@tiptap/extension-highlight": "^3.34.0",
     "@tiptap/extension-link": "^3.34.0",
     "@tiptap/pm": "^3.34.0",

@@ -3,6 +3,7 @@ import { Check, Eraser, Hand, Highlighter, PenLine, Plus, Redo2, Trash2, Undo2 }
 import { INK_WIDTH, drawStroke as drawInk } from '../ink';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { InkPoint, InkStroke } from '../db';
+import { ConfirmDialog } from './ConfirmDialog';
 
 /** All ink is stored in a 1000-unit-wide space so it scales to any screen width. */
 const WIDTH = INK_WIDTH;
@@ -59,6 +60,7 @@ export function InkPad({ initial, onChange }: Props) {
   const [size, setSize] = useState(PEN_SIZES[1]);
   /** Once a stylus is seen, fingers scroll instead of drawing (palm rejection). */
   const [fingerDraws, setFingerDraws] = useState(true);
+  const [confirmClear, setConfirmClear] = useState(false);
   const [extra, setExtra] = useState(0);
   const [width, setWidth] = useState(0);
   const [themeTick, setThemeTick] = useState(0);
@@ -318,13 +320,23 @@ export function InkPad({ initial, onChange }: Props) {
           <ActionIcon
             size="lg"
             color="red"
-            onClick={() => strokes.length && confirm('Erase all handwriting in this note?') && commit([])}
+            onClick={() => strokes.length && setConfirmClear(true)}
             disabled={!strokes.length}
             aria-label="Clear handwriting"
           >
             <Trash2 size={18} />
           </ActionIcon>
         </Tooltip>
+        <ConfirmDialog
+          opened={confirmClear}
+          onClose={() => setConfirmClear(false)}
+          onConfirm={() => commit([])}
+          title="Clear all handwriting?"
+          confirmLabel="Clear handwriting"
+          icon={Eraser}
+        >
+          Everything drawn in this note will be erased. You can bring it back with Undo while the note is open.
+        </ConfirmDialog>
       </Group>
       <div className="ink-scroll" ref={scroller}>
         <div className="ink-page" style={{ height: height * scale }}>

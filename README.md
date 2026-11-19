@@ -9,8 +9,8 @@ Rubies is an installable, offline-first web app (PWA). One codebase runs in Safa
 - **Side-by-side Bible and notes** on iPad landscape, laptops and desktops; Bible and Notes tabs on phones and iPad portrait.
 - **Quick look-ups.** Type a reference into the Bible search box (`John 3:16`, `jn 3:16-18`, `1 Cor 13`, `Ps 23`, `Gen 1:1-2:3`) to jump straight there, or type words for a keyword search. A trailing `*` matches word forms (`forgiv*`), `"double quotes"` match a phrase, and results can be filtered to the Old or New Testament.
 - **Tap verses** to highlight them in 5 colours, bookmark, copy, or **add them to the open note** as a formatted quotation.
-- **Sermon notes** with title, type (sermon, sermonette or Bible study), date, speaker and location. Speaker and location auto-complete and carry over from your last note.
-- **Rich text:** bold, italic, underline, highlight, headings, lists and quotes. The **Insert verse** button looks up and inserts any passage.
+- **Sermon notes** with title, type (sermon, sermonette, Bible study or personal study), date, speaker and location. Speaker and location auto-complete and carry over from your last note.
+- **Rich text:** bold, italic, underline, highlight, headings, lists and quotes.
 - **Verse ↔ note links.** Any reference written in a note (like "Rom 5:8") is detected automatically. Verses cited in your notes show a 📓 marker in the Bible, and tapping the verse lists the notes that cite it.
 - **Handwriting** (Write mode) with Apple Pencil pressure, pen colours and sizes, highlighter, eraser, and undo/redo on lined paper. After a pen is detected, fingers scroll instead of drawing (palm rejection); the ✋ button toggles this.
 - **Light and dark themes**, and adjustable Bible and note text sizes.
@@ -45,11 +45,34 @@ The UI is built with [Mantine](https://mantine.dev) components (theme in `src/th
 
 ## Getting it onto devices
 
-PWAs must be served over **HTTPS** to install. Deploy `dist/` to any static host (Netlify, Cloudflare Pages, Vercel, or GitHub Pages), then:
+PWAs must be served over **HTTPS** to install. Rubies is published on **GitHub Pages** at
+**https://hachadwick.github.io/Rubies/**. People open that address, then:
 
-- **iPad / iPhone:** open the site in Safari → Share → Add to Home Screen.
-- **Android:** open the site in Chrome → menu → Install app.
-- **Windows / Mac:** open the site in Chrome or Edge → the install icon in the address bar.
+- **iPad / iPhone:** Safari → Share → Add to Home Screen.
+- **Android:** Chrome → menu → Install app.
+- **Windows / Mac:** Chrome or Edge → the install icon in the address bar.
+
+After that it works offline. Each person's notes stay on their own device; nothing is sent back to the site.
+
+### Publishing
+
+Publishing is automatic: every push to `main` runs `.github/workflows/pages.yml`, which runs the tests, builds the
+site with `npm run build:web` and publishes it. Installed copies pick up the new version the next time they're
+opened with internet. The Actions tab also has a **Run workflow** button to publish without a new push.
+
+One-time setup: in the repository on GitHub, **Settings → Pages → Build and deployment → Source: GitHub Actions**.
+GitHub Pages publishes from a private repository only on a paid plan (Pro or Team); on the free plan the repository
+must be public. Either way, the published site itself is public.
+
+To try the published build locally:
+
+```sh
+npm run build:web      # builds for /Rubies/ into dist-web/ (the desktop build in dist/ is separate)
+npm run preview:web    # http://localhost:4173/Rubies/
+```
+
+The `/Rubies/` in those two scripts in `package.json` must match the repository name (GitHub Pages serves the site
+at `/<repository>/`, and the letter case matters).
 
 ### Desktop app (Windows / Mac)
 

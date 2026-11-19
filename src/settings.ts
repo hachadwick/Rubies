@@ -6,9 +6,11 @@ export interface Settings {
   bibleFontSize: number;
   /** Note body text size in px. */
   noteFontSize: number;
+  /** Suggest reviewing a note when it hasn't been reviewed in this many days; 0 = never. */
+  reviewEveryDays: number;
 }
 
-const DEFAULTS: Settings = { bibleFontSize: 19, noteFontSize: 17 };
+const DEFAULTS: Settings = { bibleFontSize: 19, noteFontSize: 17, reviewEveryDays: 90 };
 const KEY = 'rubies.settings';
 
 function read(): Settings {

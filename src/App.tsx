@@ -1,7 +1,7 @@
 import { Button, Center, Loader, Stack, Text, ThemeIcon, UnstyledButton } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
-import { BookOpen, NotebookPen, TriangleAlert } from 'lucide-react';
+import { BellRing, BookOpen, Flame, NotebookPen, TriangleAlert } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { loadBible } from './bible/kjv';
 import type { Ref } from './bible/reference';
@@ -9,7 +9,10 @@ import { BiblePane, type BibleLocation } from './components/BiblePane';
 import { NoteEditor } from './components/NoteEditor';
 import { NotesList } from './components/NotesList';
 import { SettingsDialog } from './components/SettingsDialog';
+import { PrayerList } from './components/PrayerList';
+import { SplitHandle, useSplit } from './components/SplitHandle';
 import { requestPersistentStorage } from './db';
+import { takeDueReminders } from './prayer';
 import { useSettings } from './settings';
 
 const LOC_KEY = 'rubies.location';
@@ -40,6 +43,7 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const inserter = useRef<((refs: Ref[]) => void) | null>(null);
   const [canInsert, setCanInsert] = useState(false);
+  const { split, setSplit, style: splitStyle } = useSplit();
 
   const load = useCallback(() => {
     setError(null);
@@ -71,6 +75,50 @@ export default function App() {
     setTab('notes');
   }, []);
 
+  const [showPrayers, setShowPrayers] = useState(false);
+
+  // Follow-up reminders: when the app opens and every half hour while it's open, each request whose follow-up
+  // date has come is mentioned once a day, in the app and (where the system allows it) as a desktop notification.
+  useEffect(() => {
+    if (!ready) return;
+    const check = async () => {
+      const due = await takeDueReminders();
+      if (!due.length) return;
+      const title = due.length === 1 ? 'Time to follow up on a prayer request' : `Time to follow up on ${due.length} prayer requests`;
+      const body = due.length === 1 ? due[0].text : due.map((p) => `• ${p.text.split('\n')[0]}`).slice(0, 4).join('\n');
+      notifications.show({
+        id: 'prayer-reminder',
+        title,
+        message: (
+          <>
+            <Text size="sm" lineClamp={4} style={{ whiteSpace: 'pre-line' }}>
+              {body}
+            </Text>
+            <Button size="compact-sm" variant="light" mt="xs" leftSection={<Flame size={14} />} onClick={() => {
+              notifications.hide('prayer-reminder');
+              setShowPrayers(true);
+            }}>
+              Open prayer list
+            </Button>
+          </>
+        ),
+        icon: <BellRing size={18} />,
+        autoClose: false,
+        radius: 'lg',
+      });
+      if ('Notification' in window && Notification.permission === 'granted' && document.visibilityState !== 'visible') {
+        const n = new Notification(title, { body, tag: 'rubies-prayer' });
+        n.onclick = () => {
+          window.focus();
+          setShowPrayers(true);
+        };
+      }
+    };
+    check();
+    const timer = window.setInterval(check, 30 * 60 * 1000);
+    return () => window.clearInterval(timer);
+  }, [ready]);
+
   if (error)
     return (
       <Center h="100%">
@@ -94,7 +142,7 @@ export default function App() {
     );
 
   return (
-    <div className={`app ${wide ? 'wide' : 'narrow'} show-${tab}`}>
+    <div className={`app ${wide ? 'wide' : 'narrow'} show-${tab}`} style={wide ? splitStyle : undefined}>
       <BiblePane
         loc={loc}
         onNavigate={setLoc}
@@ -109,16 +157,26 @@ export default function App() {
         onOpenNote={openNote}
         toast={toast}
       />
+      {wide && <SplitHandle split={split} onChange={setSplit} />}
       {noteId ? (
         <NoteEditor
           noteId={noteId}
           onBack={() => setNoteId(null)}
           registerInserter={registerInserter}
           toast={toast}
+          onOpenPrayers={() => setShowPrayers(true)}
+          reviewEveryDays={settings.reviewEveryDays}
         />
       ) : (
-        <NotesList onOpen={openNote} onSettings={() => setShowSettings(true)} />
+        <NotesList
+          onOpen={openNote}
+          onSettings={() => setShowSettings(true)}
+          onPrayers={() => setShowPrayers(true)}
+          reviewEveryDays={settings.reviewEveryDays}
+        />
       )}
+
+      <PrayerList opened={showPrayers} onClose={() => setShowPrayers(false)} onOpenNote={openNote} />
 
       {!wide && (
         <nav className="tabbar" aria-label="Sections">
