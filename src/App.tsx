@@ -183,7 +183,20 @@ export default function App() {
           tabs={readerTabs}
         />
       ) : (
-        <LibraryPane tabs={readerTabs} onInsert={canInsert ? insert : undefined} toast={toast} />
+        <LibraryPane
+          tabs={readerTabs}
+          onInsert={canInsert ? insert : undefined}
+          onOpenRef={(r) => {
+            setReader('bible');
+            setLoc({
+              book: r.book,
+              chapter: r.chapter,
+              focus: r.verse ? [r.verse, r.endChapter && r.endChapter !== r.chapter ? 999 : (r.endVerse ?? r.verse)] : undefined,
+              nonce: Date.now(),
+            });
+          }}
+          toast={toast}
+        />
       )}
       {wide && <SplitHandle split={split} onChange={setSplit} />}
       {noteId ? (

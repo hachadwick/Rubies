@@ -128,7 +128,7 @@ export interface LibrarySection {
 }
 
 /** The tables that are backed up and synced. */
-export const SYNCED_TABLES = ['notes', 'highlights', 'bookmarks', 'prayers', 'libraryBooks'] as const;
+export const SYNCED_TABLES = ['notes', 'highlights', 'bookmarks', 'prayers', 'libraryBooks', 'libraryHighlights', 'libraryBookmarks'] as const;
 export type SyncedTable = (typeof SYNCED_TABLES)[number];
 
 /**
@@ -150,6 +150,8 @@ export const db = new Dexie('rubies') as Dexie & {
   tombstones: EntityTable<Tombstone, 'key'>;
   libraryBooks: EntityTable<LibraryBook, 'id'>;
   librarySections: Dexie.Table<LibrarySection, [string, number]>;
+  libraryHighlights: EntityTable<Highlight, 'key'>;
+  libraryBookmarks: EntityTable<Bookmark, 'key'>;
 };
 
 db.version(1).stores({
@@ -167,6 +169,22 @@ db.version(4).stores({
   libraryBooks: 'id, importedAt',
   librarySections: '[bookId+index], bookId',
 });
+// Highlights and bookmarks in Library books, keyed "bookId:section:paragraph:sentence" (a book's text never
+// changes after it's imported, so those numbers always point at the same sentence).
+db.version(5).stores({
+  libraryHighlights: 'key',
+  libraryBookmarks: 'key, createdAt',
+});
+
+/** The key of a sentence in a Library book. */
+export const sentenceKey = (bookId: string, section: number, para: number, sentence: number) =>
+  `${bookId}:${section}:${para}:${sentence}`;
+
+export function parseSentenceKey(key: string): { bookId: string; section: number; para: number; sentence: number } {
+  const parts = key.split(':');
+  const [section, para, sentence] = parts.slice(-3).map(Number);
+  return { bookId: parts.slice(0, -3).join(':'), section, para, sentence };
+}
 
 /** Set on a transaction that's applying deletions from the cloud, which already carry their own tombstones. */
 export const FROM_SYNC = '__rubiesFromSync';
@@ -239,6 +257,9 @@ export interface Backup {
   tombstones?: Tombstone[];
   /** The Library's books (without their text), in the cloud sync file (not in exported backups). */
   libraryBooks?: LibraryBook[];
+  /** Highlights and bookmarks in Library books, in the cloud sync file (not in exported backups). */
+  libraryHighlights?: Highlight[];
+  libraryBookmarks?: Bookmark[];
 }
 
 export async function exportBackup(): Promise<Backup> {

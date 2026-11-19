@@ -104,4 +104,12 @@ export function findBook(input: string): Book | undefined {
   return matches.length === 1 ? matches[0] : undefined;
 }
 
+/** Finds a book only by its full name or a standard abbreviation (for spotting references in running text). */
+export function findBookExact(input: string): Book | undefined {
+  return exact.get(norm(input));
+}
+
+/** Whether `input` is the book's full name, as opposed to an abbreviation. */
+export const isFullName = (b: Book, input: string) => norm(b.name) === norm(input);
+
 export const bookById = (id: number): Book => BOOKS[id - 1];

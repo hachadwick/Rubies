@@ -405,6 +405,23 @@ h2 {
   padding: 6px 16px 14px;
   border-bottom: 1px solid var(--border);
 }
+/* The details folded into one line: title, then type · date · speaker · location. Tap to open again. */
+.meta.meta-collapsed {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 16px 10px;
+}
+@media (hover: hover) {
+  .meta.meta-collapsed:hover {
+    background: var(--soft);
+  }
+}
+.meta-toggle-icon {
+  flex-shrink: 0;
+  color: var(--mantine-color-dimmed);
+}
 .title-input {
   font-weight: 700 !important;
   font-size: 26px !important;
@@ -858,6 +875,36 @@ h2 {
 .sent.selected {
   background: var(--accent-soft);
   box-shadow: 0 0 0 2px var(--accent);
+}
+/* Highlight colours (these win over the hover shade; a selected sentence shows the selection instead). */
+.sent.hl-yellow:not(.selected) {
+  background: var(--hl-yellow);
+}
+.sent.hl-green:not(.selected) {
+  background: var(--hl-green);
+}
+.sent.hl-blue:not(.selected) {
+  background: var(--hl-blue);
+}
+.sent.hl-pink:not(.selected) {
+  background: var(--hl-pink);
+}
+.sent.hl-orange:not(.selected) {
+  background: var(--hl-orange);
+}
+/* A Bible reference in a book: opens the Bible there. */
+.bible-ref {
+  color: var(--accent);
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  border-radius: 3px;
+}
+@media (hover: hover) {
+  .bible-ref:hover {
+    text-decoration-thickness: 2px;
+  }
 }
 .sent.flash {
   animation: flash 2s ease-out;

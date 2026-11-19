@@ -11,19 +11,20 @@ import {
   Text,
   TextInput,
   Tooltip,
+  UnstyledButton,
   type TextInputProps,
 } from '@mantine/core';
 import { RichTextEditor } from '@mantine/tiptap';
 import Highlight from '@tiptap/extension-highlight';
 import { useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
-import { ArrowLeft, CalendarCheck, Check, History, Copy, FileDown, FileText, Loader2, Mail, PenLine, Share, Share2, Trash2, Type } from 'lucide-react';
+import { ArrowLeft, CalendarCheck, Check, ChevronDown, ChevronUp, History, Copy, FileDown, FileText, Loader2, Mail, PenLine, Share, Share2, Trash2, Type } from 'lucide-react';
 import { canShare, copyNote, emailNote, exportPdf, exportWord, shareNote } from '../exporting';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getPassage, refKeys } from '../bible/kjv';
 import { extractRefs, formatRef, parseRefs, type Ref } from '../bible/reference';
-import { db, hasSpeaker, NOTE_KINDS, type InkStroke, type Note, type NoteKind } from '../db';
-import { escapeHtml, noteTitle } from '../util';
+import { db, hasSpeaker, kindLabel, NOTE_KINDS, type InkStroke, type Note, type NoteKind } from '../db';
+import { escapeHtml, formatDate, noteTitle } from '../util';
 import { refsLabel } from './BiblePane';
 import { InkPad } from './InkPad';
 import { ConfirmDialog } from './ConfirmDialog';
@@ -72,6 +73,8 @@ export function NoteEditor(props: Props) {
     );
   return <Editor_ key={note.id} initial={note} {...props} />;
 }
+
+const DETAILS_KEY = 'rubies.noteDetails';
 
 const isEmpty = (n: Note) =>
   !n.title.trim() && !n.passage.trim() && !n.speaker.trim() && !n.church.trim() && !n.bodyText.trim() && !n.ink.length;
@@ -139,6 +142,23 @@ function Editor_({ initial, onBack, registerInserter, toast, onOpenPrayers, revi
   const [saved, setSaved] = useState(true);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [suggest, setSuggest] = useState<{ speakers: string[]; churches: string[] }>({ speakers: [], churches: [] });
+  // The details (title, type, date, speaker, location, review) can be folded into one line for more writing room.
+  // It's remembered for every note.
+  const [collapsed, setCollapsedState] = useState(() => {
+    try {
+      return localStorage.getItem(DETAILS_KEY) === 'collapsed';
+    } catch {
+      return false;
+    }
+  });
+  const setCollapsed = (c: boolean) => {
+    setCollapsedState(c);
+    try {
+      localStorage.setItem(DETAILS_KEY, c ? 'collapsed' : 'open');
+    } catch {
+      /* ignore */
+    }
+  };
 
   const noteRef = useRef<Note>(initial);
   const timer = useRef<number | undefined>(undefined);
@@ -302,16 +322,46 @@ function Editor_({ initial, onBack, registerInserter, toast, onOpenPrayers, revi
         </ConfirmDialog>
       </header>
 
+      {collapsed ? (
+        <UnstyledButton className="meta meta-collapsed" onClick={() => setCollapsed(false)} aria-expanded={false} aria-label="Show note details">
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <Text fw={700} fz={20} truncate c={meta.title.trim() ? undefined : 'dimmed'}>
+              {meta.title.trim() || 'Untitled'}
+            </Text>
+            <Group gap={6} wrap="nowrap" c="dimmed">
+              {isStale({ ...noteRef.current, lastReviewedAt }, reviewEveryDays) && (
+                <Tooltip label="Due for review">
+                  <History size={14} color="var(--accent)" />
+                </Tooltip>
+              )}
+              <Text size="sm" inherit truncate>
+                {[kindLabel(kind), formatDate(meta.date), hasSpeaker(kind) && meta.speaker.trim(), hasSpeaker(kind) && meta.church.trim()]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </Text>
+            </Group>
+          </div>
+          <ChevronDown size={20} className="meta-toggle-icon" />
+        </UnstyledButton>
+      ) : (
       <div className="meta">
-        <TextInput
-          variant="unstyled"
-          size="xl"
-          value={meta.title}
-          onChange={(e) => setField('title', e.currentTarget.value)}
-          placeholder="Title"
-          aria-label="Title"
-          classNames={{ input: 'title-input' }}
-        />
+        <Group gap={4} wrap="nowrap" align="center">
+          <TextInput
+            variant="unstyled"
+            size="xl"
+            value={meta.title}
+            onChange={(e) => setField('title', e.currentTarget.value)}
+            placeholder="Title"
+            aria-label="Title"
+            classNames={{ input: 'title-input' }}
+            style={{ flex: 1, minWidth: 0 }}
+          />
+          <Tooltip label="Hide details">
+            <ActionIcon variant="subtle" color="gray" onClick={() => setCollapsed(true)} aria-expanded aria-label="Hide note details">
+              <ChevronUp size={20} />
+            </ActionIcon>
+          </Tooltip>
+        </Group>
         <Radio.Group
           value={kind}
           onChange={(v) => {
@@ -364,6 +414,7 @@ function Editor_({ initial, onBack, registerInserter, toast, onOpenPrayers, revi
           }}
         />
       </div>
+      )}
 
       {mode === 'type' ? (
         <RichTextEditor editor={editor} variant="subtle" className="rte">

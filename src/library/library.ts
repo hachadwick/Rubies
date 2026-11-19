@@ -36,18 +36,26 @@ export async function importPdf(
   return book;
 }
 
+/** Removes a book with its highlights and bookmarks (each removal is recorded, so sync removes them everywhere). */
 export async function deleteBook(id: string): Promise<void> {
-  await db.transaction('rw', db.libraryBooks, db.librarySections, async () => {
+  await db.transaction('rw', [db.libraryBooks, db.librarySections, db.libraryHighlights, db.libraryBookmarks], async () => {
+    await db.libraryHighlights.where('key').startsWith(`${id}:`).delete();
+    await db.libraryBookmarks.where('key').startsWith(`${id}:`).delete();
     await db.librarySections.where('bookId').equals(id).delete();
     await db.libraryBooks.delete(id);
   });
 }
 
-/** Where a passage comes from: "Gerald Flurry, The Father’s Love, pp. 7–8". */
-export function citation(book: Pick<LibraryBook, 'title' | 'author'>, pages: string[]): string {
+/**
+ * Where a passage comes from: "Gerald Flurry, The Father’s Love, Chapter 1: Your Spectacular Baptismal Covenant,
+ * pp. 7–8". The chapter is left out when it's just the book's own name (a title page).
+ */
+export function citation(book: Pick<LibraryBook, 'title' | 'author'>, pages: string[], chapter = ''): string {
   const pgs = [...new Set(pages.filter(Boolean))];
   const where = !pgs.length ? '' : pgs.length === 1 ? `, p. ${pgs[0]}` : `, pp. ${pgs[0]}–${pgs[pgs.length - 1]}`;
-  return `${book.author.trim() ? `${book.author.trim()}, ` : ''}${book.title}${where}`;
+  const ch = chapter.trim().replace(/\s+—\s+/, ': ');
+  const inChapter = ch && normalize(ch) !== normalize(book.title) ? `, ${ch}` : '';
+  return `${book.author.trim() ? `${book.author.trim()}, ` : ''}${book.title}${inChapter}${where}`;
 }
 
 /** Text for searching: lower case, straight apostrophes and quotes. */

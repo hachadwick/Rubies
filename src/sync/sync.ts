@@ -105,17 +105,19 @@ export function useSyncState(): SyncState {
 // --- Syncing ----------------------------------------------------------------------------------------------------
 
 async function readLocal(): Promise<SyncData> {
-  const [notes, highlights, bookmarks, prayers, books, tombstones] = await Promise.all([
+  const [notes, highlights, bookmarks, prayers, books, libraryHighlights, libraryBookmarks, tombstones] = await Promise.all([
     db.notes.toArray(),
     db.highlights.toArray(),
     db.bookmarks.toArray(),
     db.prayers.toArray(),
     db.libraryBooks.toArray(),
+    db.libraryHighlights.toArray(),
+    db.libraryBookmarks.toArray(),
     db.tombstones.toArray(),
   ]);
   // A book goes in the list once its text is in Drive (see uploadNewBooks).
   const libraryBooks = books.filter((b) => b.fileId);
-  return { notes, highlights, bookmarks, prayers, libraryBooks, tombstones };
+  return { notes, highlights, bookmarks, prayers, libraryBooks, libraryHighlights, libraryBookmarks, tombstones };
 }
 
 function parseRemote(raw: unknown): SyncData {
@@ -127,6 +129,8 @@ function parseRemote(raw: unknown): SyncData {
     bookmarks: b.bookmarks ?? [],
     prayers: b.prayers ?? [],
     libraryBooks: b.libraryBooks ?? [],
+    libraryHighlights: b.libraryHighlights ?? [],
+    libraryBookmarks: b.libraryBookmarks ?? [],
     tombstones: b.tombstones ?? [],
   };
 }
@@ -148,7 +152,17 @@ async function applyLocal(local: SyncData, merged: SyncData, drive: BookDrive) {
   if (!any) return;
   // New books' text is downloaded first (it can't be fetched inside a database transaction).
   const books = await fetchBooks(drive, c.libraryBooks.put as LibraryBook[]);
-  const tables = [db.notes, db.highlights, db.bookmarks, db.prayers, db.libraryBooks, db.librarySections, db.tombstones];
+  const tables = [
+    db.notes,
+    db.highlights,
+    db.bookmarks,
+    db.prayers,
+    db.libraryBooks,
+    db.librarySections,
+    db.libraryHighlights,
+    db.libraryBookmarks,
+    db.tombstones,
+  ];
   await db.transaction('rw', tables, async (tx) => {
     (tx as unknown as Record<string, unknown>)[FROM_SYNC] = true;
     for (const t of SYNCED_TABLES) {

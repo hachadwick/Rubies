@@ -7,6 +7,8 @@ export interface SyncData {
   bookmarks: Bookmark[];
   prayers: Prayer[];
   libraryBooks: LibraryBook[];
+  libraryHighlights: Highlight[];
+  libraryBookmarks: Bookmark[];
   tombstones: Tombstone[];
 }
 
@@ -20,6 +22,8 @@ const KEYS: Record<SyncedTable, { id: (r: Rec) => string; version: (r: Rec) => n
   // Highlights and bookmarks are replaced, not edited, so when they were made is their version.
   highlights: { id: (r) => (r as Highlight).key, version: (r) => (r as Highlight).createdAt ?? 0 },
   bookmarks: { id: (r) => (r as Bookmark).key, version: (r) => (r as Bookmark).createdAt ?? 0 },
+  libraryHighlights: { id: (r) => (r as Highlight).key, version: (r) => (r as Highlight).createdAt ?? 0 },
+  libraryBookmarks: { id: (r) => (r as Bookmark).key, version: (r) => (r as Bookmark).createdAt ?? 0 },
 };
 
 const TABLES = Object.keys(KEYS) as SyncedTable[];
@@ -86,4 +90,13 @@ export function sameData(a: SyncData, b: SyncData): boolean {
   return a.tombstones.length === bt.size && a.tombstones.every((t) => bt.get(t.key) === t.deletedAt);
 }
 
-export const emptySyncData = (): SyncData => ({ notes: [], highlights: [], bookmarks: [], prayers: [], libraryBooks: [], tombstones: [] });
+export const emptySyncData = (): SyncData => ({
+  notes: [],
+  highlights: [],
+  bookmarks: [],
+  prayers: [],
+  libraryBooks: [],
+  libraryHighlights: [],
+  libraryBookmarks: [],
+  tombstones: [],
+});

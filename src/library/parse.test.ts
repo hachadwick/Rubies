@@ -119,4 +119,9 @@ describe('citation', () => {
     expect(citation({ title: 'The Book', author: '' }, ['12'])).toBe('The Book, p. 12');
     expect(citation({ title: 'The Book', author: '' }, [''])).toBe('The Book');
   });
+  it('names the chapter, except a title page', () => {
+    expect(citation({ title: 'The Book', author: '' }, ['7'], 'Chapter 1 — The Start')).toBe('The Book, Chapter 1: The Start, p. 7');
+    expect(citation({ title: 'The Book', author: '' }, ['7'], 'Introduction')).toBe('The Book, Introduction, p. 7');
+    expect(citation({ title: 'The Book', author: '' }, [''], 'The Book')).toBe('The Book');
+  });
 });

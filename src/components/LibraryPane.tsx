@@ -4,12 +4,14 @@ import {
   Badge,
   Button,
   CloseButton,
+  ColorSwatch,
   Group,
   Kbd,
   Menu,
   Modal,
   Paper,
   Progress,
+  SegmentedControl,
   Stack,
   Text,
   TextInput,
@@ -19,6 +21,8 @@ import {
 } from '@mantine/core';
 import { useLiveQuery } from 'dexie-react-hooks';
 import {
+  Bookmark,
+  BookmarkCheck,
   BookCopy,
   BookText,
   ChevronDown,
@@ -26,6 +30,7 @@ import {
   ChevronRight,
   Copy,
   EllipsisVertical,
+  Eraser,
   FileUp,
   Library,
   NotebookPen,
@@ -34,9 +39,12 @@ import {
   Trash2,
 } from 'lucide-react';
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { db, type LibraryBook } from '../db';
+import type { Ref } from '../bible/reference';
+import { db, parseSentenceKey, sentenceKey, type HighlightColor, type LibraryBook } from '../db';
 import type { Insertion } from '../insertion';
 import { citation, deleteBook, importPdf, normalize } from '../library/library';
+import { sectionRefs, type FoundRef } from '../library/refs';
+import { HIGHLIGHT_COLORS } from './BiblePane';
 import { syncSupported } from '../sync/google';
 import { useSyncState } from '../sync/sync';
 import { copyText } from '../util';
@@ -67,11 +75,21 @@ interface Props {
   tabs: ReactNode;
   /** Present when a note is open; adds the quote to it. */
   onInsert?: (what: Insertion) => void;
+  /** Opens the Bible at a passage mentioned in the book. */
+  onOpenRef: (ref: Ref) => void;
   toast: (msg: string) => void;
 }
 
-export function LibraryPane({ tabs, onInsert, toast }: Props) {
-  const [place, setPlace] = useState<Place | null>(readPlace);
+/** Where the reader was when they followed a reference to the Bible, so coming back returns there. */
+let returnTo: Place | null = null;
+
+export function LibraryPane({ tabs, onInsert, onOpenRef, toast }: Props) {
+  const [place, setPlace] = useState<Place | null>(() => {
+    const p = readPlace();
+    const back = returnTo;
+    returnTo = null;
+    return back && p && back.bookId === p.bookId && back.section === p.section ? back : p;
+  });
 
   useEffect(() => {
     try {
@@ -94,7 +112,18 @@ export function LibraryPane({ tabs, onInsert, toast }: Props) {
     <section className="pane bible-pane library-pane" aria-label="Library">
       {tabs}
       {place && book ? (
-        <Reader book={book} place={place} onPlace={setPlace} onClose={() => setPlace(null)} onInsert={onInsert} toast={toast} />
+        <Reader
+          book={book}
+          place={place}
+          onPlace={setPlace}
+          onClose={() => setPlace(null)}
+          onInsert={onInsert}
+          onOpenRef={(ref, at) => {
+            returnTo = { bookId: book.id, section: place.section, focus: at, nonce: Date.now() };
+            onOpenRef(ref);
+          }}
+          toast={toast}
+        />
       ) : (
         <Shelf onOpen={(bookId) => setPlace({ bookId, section: 0 })} toast={toast} />
       )}
@@ -316,6 +345,7 @@ function Reader({
   onPlace,
   onClose,
   onInsert,
+  onOpenRef,
   toast,
 }: {
   book: LibraryBook;
@@ -323,6 +353,8 @@ function Reader({
   onPlace: (p: Place) => void;
   onClose: () => void;
   onInsert?: (what: Insertion) => void;
+  /** Opens the Bible at a reference found in sentence `at` ([paragraph, sentence]). */
+  onOpenRef: (ref: Ref, at: [number, number]) => void;
   toast: (msg: string) => void;
 }) {
   const index = Math.min(place.section, Math.max(0, book.sections.length - 1));
@@ -332,7 +364,21 @@ function Reader({
   const [picking, setPicking] = useState(false);
   const [query, setQuery] = useState('');
   const [search, setSearch] = useState<{ query: string; hits: Hit[]; total: number } | null>(null);
+  const [saved, setSaved] = useState(false);
   const scroller = useRef<HTMLDivElement>(null);
+
+  // Highlights and bookmarks in this section, keyed by the full sentence key.
+  const prefix = `${book.id}:${index}:`;
+  const highlights = useLiveQuery(
+    async () => new Map((await db.libraryHighlights.where('key').startsWith(prefix).toArray()).map((h) => [h.key, h.color])),
+    [prefix],
+  );
+  const bookmarks = useLiveQuery(
+    async () => new Set((await db.libraryBookmarks.where('key').startsWith(prefix).primaryKeys()) as string[]),
+    [prefix],
+  );
+  // Bible references in the text, to show as links.
+  const refs = useMemo(() => (section ? sectionRefs(section.paras) : new Map<string, FoundRef[]>()), [section]);
 
   // On moving to another section or a search result: clear the selection, scroll, and flash the sentence.
   useEffect(() => {
@@ -352,6 +398,7 @@ function Reader({
 
   const go = (i: number, focus?: [number, number]) => {
     setSearch(null);
+    setSaved(false);
     onPlace({ bookId: book.id, section: i, focus, nonce: Date.now() });
   };
 
@@ -372,6 +419,7 @@ function Reader({
           if (hits.length < 200) hits.push({ section: s.index, para: pi, sentence: si, text });
         }),
       );
+    setSaved(false);
     setSearch({ query: q, hits, total });
   };
 
@@ -398,7 +446,7 @@ function Reader({
     return { paragraphs, pages };
   }, [section, selected]);
 
-  const cite = citation(book, picked.pages);
+  const cite = citation(book, picked.pages, book.sections[index]?.title);
   const toggle = (key: string) => setSelected((s) => (s.includes(key) ? s.filter((k) => k !== key) : [...s, key]));
 
   const copy = async () => {
@@ -411,9 +459,63 @@ function Reader({
     setSelected([]);
   };
 
+  // The selection as full sentence keys, in reading order.
+  const selKeys = selected
+    .map((k) => k.split(':').map(Number) as [number, number])
+    .sort((a, b) => a[0] - b[0] || a[1] - b[1])
+    .map(([p, s]) => sentenceKey(book.id, index, p, s));
+  const marked = selKeys.filter((k) => bookmarks?.has(k));
+
+  const setHighlight = async (color: HighlightColor | null) => {
+    if (color) await db.libraryHighlights.bulkPut(selKeys.map((key) => ({ key, color, createdAt: Date.now() })));
+    else await db.libraryHighlights.bulkDelete(selKeys);
+    setSelected([]);
+  };
+
+  const toggleBookmark = async () => {
+    if (marked.length) {
+      await db.libraryBookmarks.bulkDelete(marked);
+      toast('Bookmark removed');
+    } else {
+      // One bookmark for the passage, on its first sentence.
+      await db.libraryBookmarks.put({ key: selKeys[0], label: cite, createdAt: Date.now() });
+      toast(`Bookmarked ${cite}`);
+    }
+    setSelected([]);
+  };
+
   const atStart = index === 0;
   const atEnd = index >= book.sections.length - 1;
   const inFlash = (pi: number, si: number) => flash && flash[0] === pi && flash[1] === si;
+
+  /** A sentence's text with its Bible references as links. */
+  const sentenceText = (text: string, pi: number, si: number): ReactNode => {
+    const found = refs.get(`${pi}:${si}`);
+    if (!found) return text;
+    const out: ReactNode[] = [];
+    let at = 0;
+    for (const f of found) {
+      out.push(text.slice(at, f.start));
+      out.push(
+        <a
+          key={f.start}
+          href="#"
+          className="bible-ref"
+          title="Open in the Bible"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onOpenRef(f.ref, [pi, si]);
+          }}
+        >
+          {text.slice(f.start, f.end)}
+        </a>,
+      );
+      at = f.end;
+    }
+    out.push(text.slice(at));
+    return out;
+  };
 
   return (
     <>
@@ -440,6 +542,19 @@ function Reader({
         <ActionIcon onClick={() => go(index + 1)} aria-label="Next section" disabled={atEnd}>
           <ChevronRight />
         </ActionIcon>
+        <Tooltip label="Bookmarks & highlights">
+          <ActionIcon
+            variant={saved ? 'light' : 'subtle'}
+            color={saved ? undefined : 'gray'}
+            onClick={() => {
+              setSearch(null);
+              setSaved(!saved);
+            }}
+            aria-label="Bookmarks and highlights in this book"
+          >
+            <Bookmark />
+          </ActionIcon>
+        </Tooltip>
       </header>
 
       <form onSubmit={runSearch} role="search" className="lookup lookup-row">
@@ -531,7 +646,9 @@ function Reader({
         </div>
       )}
 
-      <div className="verses book-text" ref={scroller} hidden={!!search}>
+      {saved && <SavedPanel book={book} onGo={(s, p, i) => go(s, [p, i])} onClose={() => setSaved(false)} />}
+
+      <div className="verses book-text" ref={scroller} hidden={!!search || saved}>
         {/* A section that opens with its own heading (most chapters) shows that instead of its name. */}
         {section && !section.paras[0]?.h && <h2 className="chapter-title">{book.sections[index]?.title}</h2>}
         {section?.paras.map((p, pi) => {
@@ -545,6 +662,8 @@ function Reader({
               )}
               {p.s.map((s, si) => {
                 const key = `${pi}:${si}`;
+                const full = sentenceKey(book.id, index, pi, si);
+                const hl = highlights?.get(full);
                 return (
                   <Fragment key={si}>
                     <span
@@ -552,6 +671,7 @@ function Reader({
                       className={[
                         'sent',
                         p.h && si === 0 && p.s.length > 1 && 'sent-label',
+                        hl && `hl-${hl}`,
                         selected.includes(key) && 'selected',
                         inFlash(pi, si) && 'flash',
                       ]
@@ -559,7 +679,8 @@ function Reader({
                         .join(' ')}
                       onClick={() => toggle(key)}
                     >
-                      {s}
+                      {sentenceText(s, pi, si)}
+                      {bookmarks?.has(full) && <Bookmark className="vmark" size={14} aria-label="Bookmarked" />}
                     </span>{' '}
                   </Fragment>
                 );
@@ -569,7 +690,7 @@ function Reader({
         })}
       </div>
 
-      {selected.length > 0 && !search && (
+      {selected.length > 0 && !search && !saved && (
         <Paper className="action-bar" shadow="xl" withBorder p="sm" role="toolbar" aria-label="Sentence actions">
           <Group justify="space-between" wrap="nowrap" mb={8}>
             <div style={{ minWidth: 0 }}>
@@ -582,21 +703,44 @@ function Reader({
             </div>
             <CloseButton size="lg" onClick={() => setSelected([])} aria-label="Clear selection" />
           </Group>
-          <Group gap={4} justify="flex-end">
-            <ActionIcon onClick={copy} aria-label="Copy">
-              <Copy />
-            </ActionIcon>
-            {onInsert && (
-              <Button
-                leftSection={<NotebookPen size={18} />}
-                onClick={() => {
-                  onInsert({ kind: 'quote', paragraphs: picked.paragraphs, cite });
-                  setSelected([]);
-                }}
-              >
-                Add to note
-              </Button>
-            )}
+          <Group gap={6} justify="space-between">
+            <Group gap={8}>
+              {HIGHLIGHT_COLORS.map((c) => (
+                <ColorSwatch
+                  key={c}
+                  component="button"
+                  color={`var(--hl-${c}-solid)`}
+                  size={30}
+                  onClick={() => setHighlight(c)}
+                  aria-label={`Highlight ${c}`}
+                  style={{ cursor: 'pointer' }}
+                />
+              ))}
+              <Tooltip label="Remove highlight">
+                <ActionIcon size={30} radius="xl" variant="default" onClick={() => setHighlight(null)} aria-label="Remove highlight">
+                  <Eraser size={15} />
+                </ActionIcon>
+              </Tooltip>
+            </Group>
+            <Group gap={4}>
+              <ActionIcon onClick={toggleBookmark} aria-label={marked.length ? 'Remove bookmark' : 'Bookmark'}>
+                {marked.length ? <BookmarkCheck /> : <Bookmark />}
+              </ActionIcon>
+              <ActionIcon onClick={copy} aria-label="Copy">
+                <Copy />
+              </ActionIcon>
+              {onInsert && (
+                <Button
+                  leftSection={<NotebookPen size={18} />}
+                  onClick={() => {
+                    onInsert({ kind: 'quote', paragraphs: picked.paragraphs, cite });
+                    setSelected([]);
+                  }}
+                >
+                  Add to note
+                </Button>
+              )}
+            </Group>
           </Group>
         </Paper>
       )}
@@ -626,6 +770,97 @@ function Reader({
         </Stack>
       </Modal>
     </>
+  );
+}
+
+/** This book's bookmarks and highlights, like the Bible's. */
+function SavedPanel({ book, onGo, onClose }: { book: LibraryBook; onGo: (section: number, para: number, sentence: number) => void; onClose: () => void }) {
+  const [tab, setTab] = useState<'bookmarks' | 'highlights'>('bookmarks');
+  const prefix = `${book.id}:`;
+  const data = useLiveQuery(async () => {
+    const [bookmarks, highlights, sections] = await Promise.all([
+      db.libraryBookmarks.where('key').startsWith(prefix).toArray(),
+      db.libraryHighlights.where('key').startsWith(prefix).toArray(),
+      db.librarySections.where('bookId').equals(book.id).toArray(),
+    ]);
+    const text = (key: string) => {
+      const k = parseSentenceKey(key);
+      return sections.find((s) => s.index === k.section)?.paras[k.para]?.s[k.sentence] ?? '';
+    };
+    const order = (a: string, b: string) => {
+      const x = parseSentenceKey(a);
+      const y = parseSentenceKey(b);
+      return x.section - y.section || x.para - y.para || x.sentence - y.sentence;
+    };
+    return {
+      bookmarks: bookmarks.sort((a, b) => b.createdAt - a.createdAt).map((b) => ({ ...b, text: text(b.key) })),
+      highlights: highlights.sort((a, b) => order(a.key, b.key)).map((h) => ({ ...h, text: text(h.key) })),
+    };
+  }, [book.id]);
+
+  const where = (key: string) => {
+    const k = parseSentenceKey(key);
+    return book.sections[k.section]?.title ?? '';
+  };
+  const open = (key: string) => {
+    const k = parseSentenceKey(key);
+    onGo(k.section, k.para, k.sentence);
+  };
+
+  return (
+    <div className="panel">
+      <Group className="panel-head" justify="space-between" wrap="nowrap">
+        <SegmentedControl
+          value={tab}
+          onChange={(v) => setTab(v as typeof tab)}
+          data={[
+            { value: 'bookmarks', label: 'Bookmarks' },
+            { value: 'highlights', label: 'Highlights' },
+          ]}
+        />
+        <CloseButton size="lg" onClick={onClose} aria-label="Close" />
+      </Group>
+      {tab === 'bookmarks' ? (
+        data?.bookmarks.length === 0 ? (
+          <Text c="dimmed" ta="center" p="xl">
+            No bookmarks in this book yet. Tap a sentence, then the bookmark button.
+          </Text>
+        ) : (
+          <ol className="results">
+            {data?.bookmarks.map((bm) => (
+              <li key={bm.key}>
+                <UnstyledButton className="result" onClick={() => open(bm.key)}>
+                  <Text component="span" size="xs" fw={700} c="var(--accent)" tt="uppercase" className="result-ref">
+                    {where(bm.key)}
+                  </Text>
+                  <span className="result-text">{bm.text}</span>
+                </UnstyledButton>
+                <ActionIcon color="red" onClick={() => db.libraryBookmarks.delete(bm.key)} aria-label="Delete bookmark">
+                  <Trash2 size={18} />
+                </ActionIcon>
+              </li>
+            ))}
+          </ol>
+        )
+      ) : data?.highlights.length === 0 ? (
+        <Text c="dimmed" ta="center" p="xl">
+          No highlights in this book yet. Tap a sentence, then pick a colour.
+        </Text>
+      ) : (
+        <ol className="results">
+          {data?.highlights.map((h) => (
+            <li key={h.key}>
+              <UnstyledButton className="result" onClick={() => open(h.key)}>
+                <Text component="span" size="xs" fw={700} c="var(--accent)" tt="uppercase" className="result-ref">
+                  {where(h.key)}
+                </Text>
+                <span className={`result-text hl-${h.color}`}>{h.text}</span>
+              </UnstyledButton>
+            </li>
+          ))}
+        </ol>
+      )}
+    </div>
   );
 }
 
