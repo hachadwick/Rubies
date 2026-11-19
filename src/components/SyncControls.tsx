@@ -1,5 +1,5 @@
 import { ActionIcon, Alert, Avatar, Button, Group, Loader, Stack, Text, Tooltip } from '@mantine/core';
-import { Cloud, CloudAlert, CloudOff, LogOut, RefreshCw } from 'lucide-react';
+import { Cloud, CloudAlert, CloudCheck, CloudOff, LogOut, RefreshCw } from 'lucide-react';
 import { useState } from 'react';
 import { DRIVE_ACCESS_MESSAGE, GOOGLE_CLIENT_ID, syncSupported } from '../sync/google';
 import { reconnect, signIn, signOut, syncNow, useSyncState, type SyncState } from '../sync/sync';
@@ -130,13 +130,18 @@ export function SyncButton({ onOpenSettings }: { onOpenSettings: () => void }) {
   const s = useSyncState();
   if (!syncSupported() || !s.account) return null;
 
+  // Green check when the last sync worked; red with a dot when syncing is stuck and needs a tap.
+  const good = s.status === 'idle' && !!s.lastSyncedAt;
+  const bad = s.status === 'error' || s.status === 'paused';
   const icon =
     s.status === 'syncing' ? (
       <Loader size={18} />
-    ) : s.status === 'paused' || s.status === 'offline' ? (
+    ) : s.status === 'offline' || s.status === 'paused' ? (
       <CloudOff />
     ) : s.status === 'error' ? (
       <CloudAlert />
+    ) : good ? (
+      <CloudCheck />
     ) : (
       <Cloud />
     );
@@ -147,7 +152,9 @@ export function SyncButton({ onOpenSettings }: { onOpenSettings: () => void }) {
     <Tooltip label={label} multiline maw={260}>
       <ActionIcon
         aria-label={label}
-        color={s.status === 'paused' ? 'yellow' : s.status === 'error' ? 'red' : undefined}
+        pos="relative"
+        color={bad ? 'red' : good ? 'green' : undefined}
+        c={bad ? 'var(--mantine-color-red-6)' : good ? 'var(--mantine-color-green-6)' : undefined}
         onClick={() => {
           if (s.status === 'paused' && s.needsDriveAccess) onOpenSettings();
           else if (s.status === 'paused') reconnect().catch(onOpenSettings);
@@ -156,6 +163,21 @@ export function SyncButton({ onOpenSettings }: { onOpenSettings: () => void }) {
         }}
       >
         {icon}
+        {bad && (
+          <span
+            aria-hidden="true"
+            style={{
+              position: 'absolute',
+              top: 7,
+              right: 7,
+              width: 9,
+              height: 9,
+              borderRadius: '50%',
+              background: 'var(--mantine-color-red-6)',
+              boxShadow: '0 0 0 2px var(--mantine-color-body)',
+            }}
+          />
+        )}
       </ActionIcon>
     </Tooltip>
   );
