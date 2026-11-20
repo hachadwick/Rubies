@@ -788,6 +788,9 @@ h2 {
   }
 }
 .book-card {
+  /* .note-card is display: block, which would drop the menu button onto its own line. */
+  display: flex;
+  align-items: center;
   padding: 10px 8px 10px 12px;
 }
 .book-open {
