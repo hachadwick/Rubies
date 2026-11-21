@@ -712,10 +712,33 @@ h2 {
 }
 
 /* ---------- Toasts ---------- */
+/* Notifications never get in the way of the app: the strip they sit in lets clicks through to what's underneath,
+   and so does a toast itself. (A notification with a button in it, like the prayer reminder, still takes clicks.) */
+.mantine-Notifications-root {
+  pointer-events: none;
+}
+.mantine-Notifications-notification {
+  pointer-events: auto;
+}
+/* A toast: a ruby pill with white text, in the empty middle of the top bar. */
 .toast {
   width: fit-content;
-  margin: 0 auto calc(64px + env(safe-area-inset-bottom));
+  margin: 0 auto;
+  padding-block: 6px !important;
   padding-inline: 18px !important;
+  border: 0;
+  background: var(--mantine-color-ruby-9); /* the theme colour, as in the window's title bar */
+  pointer-events: none;
+}
+.toast::before {
+  display: none;
+}
+.toast .mantine-Notification-description {
+  color: #fff;
+  font-weight: 600;
+}
+.mantine-Notifications-root[data-position='top-center'] {
+  top: calc(env(safe-area-inset-top) + 10px);
 }
 
 @media (max-width: 520px) {

@@ -42,7 +42,8 @@ function readLocation(): BibleLocation {
 }
 
 const toast = (message: string) =>
-  notifications.show({ message, autoClose: 2200, withCloseButton: false, radius: 'xl', className: 'toast' });
+  // Shown in the empty middle of the top bar (see .toast), out of the way of what's being read.
+  notifications.show({ message, autoClose: 2200, withCloseButton: false, radius: 'xl', className: 'toast', position: 'top-center' });
 
 export default function App() {
   const [ready, setReady] = useState(false);
