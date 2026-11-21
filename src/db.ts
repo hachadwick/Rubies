@@ -107,6 +107,8 @@ export interface LibraryBook {
   sections: { title: string; pg: string }[];
   importedAt: number;
   updatedAt: number;
+  /** The PDF's first page as a small JPEG data: URL, shown on the shelf. Books imported before this have none. */
+  cover?: string;
   /** The Google Drive file holding the book's text, once it has been uploaded for syncing. */
   fileId?: string;
 }

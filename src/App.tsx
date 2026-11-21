@@ -1,11 +1,12 @@
 import { Button, Center, Loader, Stack, Text, ThemeIcon, UnstyledButton } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
-import { BellRing, BookOpen, Flame, Library, NotebookPen, TriangleAlert } from 'lucide-react';
+import { BellRing, BookOpen, Flame, Library, Music, NotebookPen, TriangleAlert } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { loadBible } from './bible/kjv';
 import { AppBar } from './components/AppBar';
 import { BiblePane, type BibleLocation } from './components/BiblePane';
+import { HymnalPane } from './components/HymnalPane';
 import { LibraryPane } from './components/LibraryPane';
 import { ReaderTabs, type Reader } from './components/ReaderTabs';
 import type { Insertion } from './insertion';
@@ -25,7 +26,8 @@ const READER_KEY = 'rubies.reader';
 
 function readReader(): Reader {
   try {
-    return localStorage.getItem(READER_KEY) === 'library' ? 'library' : 'bible';
+    const r = localStorage.getItem(READER_KEY);
+    return r === 'library' || r === 'hymnal' ? r : 'bible';
   } catch {
     return 'bible';
   }
@@ -185,6 +187,8 @@ export default function App() {
           toast={toast}
           tabs={readerTabs}
         />
+      ) : reader === 'hymnal' ? (
+        <HymnalPane tabs={readerTabs} />
       ) : (
         <LibraryPane
           tabs={readerTabs}
@@ -224,7 +228,11 @@ export default function App() {
         <nav className="tabbar" aria-label="Sections">
           {(
             [
-              ['bible', reader === 'library' ? 'Library' : 'Bible', reader === 'library' ? Library : BookOpen],
+              [
+                'bible',
+                reader === 'library' ? 'Library' : reader === 'hymnal' ? 'Hymnal' : 'Bible',
+                reader === 'library' ? Library : reader === 'hymnal' ? Music : BookOpen,
+              ],
               ['notes', 'Notes', NotebookPen],
             ] as const
           ).map(([key, label, Icon]) => (

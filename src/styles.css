@@ -864,6 +864,18 @@ h2 {
   align-items: center;
   padding: 10px 8px 10px 12px;
 }
+/* The PDF's first page, as the book's cover on the shelf. */
+.book-cover {
+  flex: none;
+  width: 44px;
+  max-height: 66px;
+  object-fit: cover;
+  object-position: top;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  box-shadow: var(--mantine-shadow-xs);
+  background: #fff;
+}
 .book-open {
   flex: 1;
   min-width: 0;
@@ -1094,4 +1106,166 @@ h2 {
 }
 @media (prefers-reduced-motion: reduce) {
   .fire-glow { animation-duration: 4s; }
+}
+
+/* ---------- Hymnal ---------- */
+/* The pages of the song being shown, one under the other, each as wide as the pane (up to a comfortable size). */
+.hymn-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 12px 40px;
+  -webkit-overflow-scrolling: touch;
+}
+.hymn-scroll .hymn-page {
+  max-width: 900px;
+  margin: 0 auto 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: var(--mantine-shadow-xs);
+}
+/* A page of music is always black on white paper, in dark mode too. */
+.hymn-page {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  background: #fff;
+  color: #555;
+}
+.hymn-page canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.hymn-page-state {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+/* The list of songs: the page number, then the title over where it's from. */
+.hymn-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  font-family: inherit;
+}
+.hymn-row[data-current] {
+  background: var(--accent-soft);
+}
+.hymn-row-page {
+  flex: none;
+  min-width: 2.2em;
+  text-align: right;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+}
+.hymn-row-text {
+  min-width: 0;
+}
+
+/* Full screen: the page as big as the screen allows, on black. Two-page songs slide sideways between pages. */
+.hymn-full {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  background: #111;
+  color: #fff;
+}
+.hymn-slides {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+.hymn-slides::-webkit-scrollbar {
+  display: none;
+}
+.hymn-slide {
+  flex: 0 0 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  scroll-snap-align: center;
+  scroll-snap-stop: always;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+/* The whole page in view: as wide as the screen, or as tall, whichever comes first. */
+.hymn-fit {
+  width: min(100%, calc((100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom)) * 522 / 684));
+}
+/* A phone on its side is too short for a whole page to be readable: fill the width and scroll down the page. */
+@media (orientation: landscape) and (max-height: 560px) {
+  .hymn-slide {
+    align-items: flex-start;
+    overflow-y: auto;
+  }
+  .hymn-fit {
+    width: 100%;
+  }
+}
+.hymn-full-chip {
+  position: absolute;
+  top: calc(env(safe-area-inset-top) + 8px);
+  border-radius: 14px;
+  background: rgb(20 20 20 / 0.82);
+  backdrop-filter: blur(8px);
+  transition: opacity 0.25s;
+}
+.hymn-full-title {
+  left: calc(env(safe-area-inset-left) + 8px);
+  max-width: calc(100vw - 190px);
+  padding: 8px 12px;
+  pointer-events: none;
+}
+.hymn-full-actions {
+  right: calc(env(safe-area-inset-right) + 8px);
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+}
+/* On a wide screen the page leaves a margin each side: keep the song's name inside it, off the music. */
+@media (min-aspect-ratio: 1/1) and (min-height: 561px) {
+  .hymn-full-title {
+    max-width: max(120px, calc((100vw - 100dvh * 522 / 684) / 2 - 16px));
+  }
+}
+.hymn-dots {
+  position: absolute;
+  bottom: calc(env(safe-area-inset-bottom) + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgb(20 20 20 / 0.7);
+  transition: opacity 0.25s;
+  pointer-events: none;
+}
+.hymn-dots span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 0.35);
+}
+.hymn-dots span[data-active] {
+  background: #fff;
+}
+.hymn-full:not([data-controls]) .hymn-full-chip {
+  opacity: 0;
+  pointer-events: none;
+}
+.hymn-full:not([data-controls]) .hymn-dots {
+  opacity: 0.55;
 }

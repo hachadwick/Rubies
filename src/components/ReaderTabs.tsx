@@ -1,15 +1,16 @@
 import { UnstyledButton } from '@mantine/core';
-import { BookOpen, Library } from 'lucide-react';
+import { BookOpen, Library, Music } from 'lucide-react';
 
-export type Reader = 'bible' | 'library';
+export type Reader = 'bible' | 'hymnal' | 'library';
 
-/** The switch at the top of the reading pane between the Bible and the Library. */
+/** The switch at the top of the reading pane between the Bible, the Hymnal and the Library. */
 export function ReaderTabs({ value, onChange }: { value: Reader; onChange: (r: Reader) => void }) {
   return (
     <div className="reader-tabs" role="tablist" aria-label="Read">
       {(
         [
           ['bible', 'Bible', BookOpen],
+          ['hymnal', 'Hymnal', Music],
           ['library', 'Library', Library],
         ] as const
       ).map(([key, label, Icon]) => (

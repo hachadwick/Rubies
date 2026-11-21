@@ -11,8 +11,9 @@ export default defineConfig({
       includeAssets: ['icon.svg'],
       workbox: {
         // The KJV text (~4.5 MB) is precached so the Bible works fully offline, and the PDF reader (for
-        // importing books into the Library) so that works offline too.
-        globPatterns: ['**/*.{js,mjs,css,html,svg,png,json,woff2}'],
+        // importing books into the Library) so that works offline too. So is the Hymnal (hymnal.pdf, ~7.5 MB),
+        // which is used in church where there may be no signal.
+        globPatterns: ['**/*.{js,mjs,css,html,svg,png,json,woff2,pdf}'],
         maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
         // The privacy policy is its own page, not part of the app.
         navigateFallbackDenylist: [/privacy\.html$/],

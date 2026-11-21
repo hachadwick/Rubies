@@ -8,6 +8,34 @@ export interface PdfContents {
   metaTitle?: string;
   metaAuthor?: string;
   outline: OutlineEntry[];
+  /** The first page as a small JPEG (a data: URL), for the Library shelf. Missing if it couldn't be drawn. */
+  cover?: string;
+}
+
+/** The cover is drawn this wide: enough to stay sharp at shelf size on a high-density screen, and only a few KB. */
+const COVER_WIDTH = 180;
+
+/** Draws a page small and returns it as a JPEG data: URL (undefined if this browser can't, or the page is odd). */
+async function drawCover(page: import('pdfjs-dist/legacy/build/pdf.mjs').PDFPageProxy): Promise<string | undefined> {
+  try {
+    const base = page.getViewport({ scale: 1 });
+    if (!(base.width > 0 && base.height > 0)) return undefined;
+    const viewport = page.getViewport({ scale: COVER_WIDTH / base.width });
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(viewport.width);
+    canvas.height = Math.min(Math.round(viewport.height), COVER_WIDTH * 2);
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return undefined;
+    // JPEG has no transparency: a page without its own background would come out black.
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    await page.render({ canvas, canvasContext: ctx, viewport }).promise;
+    const url = canvas.toDataURL('image/jpeg', 0.75);
+    canvas.width = canvas.height = 0;
+    return url.startsWith('data:image/jpeg') ? url : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 /**
@@ -49,6 +77,7 @@ export async function readPdf(
       return numeric!.slice(i + 1).some((m) => m !== null && m <= n) ? '' : l;
     };
     const pages: RawPage[] = [];
+    let cover: string | undefined;
     for (let i = 1; i <= pdf.numPages; i++) {
       if (signal?.aborted) throw new DOMException('Import cancelled', 'AbortError');
       const page = await pdf.getPage(i);
@@ -60,6 +89,7 @@ export async function readPdf(
         items.push({ str: it.str, x: it.transform[4] - x0, y: it.transform[5] - y0, w: it.width, h: it.height || Math.hypot(it.transform[2], it.transform[3]) });
       }
       pages.push({ items, width: x1 - x0, height: y1 - y0, label: goodLabel(i - 1) });
+      if (i === 1) cover = await drawCover(page);
       page.cleanup();
       onPage?.(i, pdf.numPages);
     }
@@ -91,7 +121,7 @@ export async function readPdf(
       /* no usable bookmarks */
     }
 
-    return { pages, metaTitle, metaAuthor, outline };
+    return { pages, metaTitle, metaAuthor, outline, cover };
   } finally {
     await task.destroy();
   }

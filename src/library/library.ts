@@ -5,7 +5,7 @@ import { readPdf } from './pdf';
 
 /**
  * Imports a PDF into the Library: reads its text, works out its chapters, paragraphs and sentences, and saves
- * that as text (the PDF itself isn't kept). pdf.js is only downloaded the first time a book is imported.
+ * that as text (the PDF itself isn't kept, only a small picture of its first page for the shelf). pdf.js is only downloaded the first time a book is imported.
  */
 export async function importPdf(
   file: File,
@@ -27,6 +27,7 @@ export async function importPdf(
     sections: parsed.sections.map((s) => ({ title: s.title, pg: s.paras.find((p) => p.pg)?.pg ?? '' })),
     importedAt: now,
     updatedAt: now,
+    ...(contents.cover ? { cover: contents.cover } : {}),
   };
   const sections: LibrarySection[] = parsed.sections.map((s, index) => ({ bookId: book.id, index, title: s.title, paras: s.paras }));
   await db.transaction('rw', db.libraryBooks, db.librarySections, async () => {

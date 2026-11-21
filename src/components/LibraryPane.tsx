@@ -232,9 +232,13 @@ function Shelf({ onOpen, toast }: { onOpen: (bookId: string) => void; toast: (ms
           {books?.map((b) => (
             <Group key={b.id} className="note-card book-card" wrap="nowrap" gap="sm">
               <UnstyledButton className="book-open" onClick={() => onOpen(b.id)}>
-                <ThemeIcon size={44} radius="md" variant="light">
-                  <BookText size={22} />
-                </ThemeIcon>
+                {b.cover ? (
+                  <img className="book-cover" src={b.cover} alt="" />
+                ) : (
+                  <ThemeIcon size={44} radius="md" variant="light">
+                    <BookText size={22} />
+                  </ThemeIcon>
+                )}
                 <div style={{ minWidth: 0 }}>
                   <Text fw={700} lineClamp={2}>
                     {b.title}
