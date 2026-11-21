@@ -113,7 +113,9 @@ export function BiblePane({ loc, onNavigate, onInsert, onOpenNote, toast, tabs }
     [prefix],
   );
   const bookmarks = useLiveQuery(
-    async () => new Set((await db.bookmarks.where('key').startsWith(prefix).primaryKeys()) as string[]),
+    // Whole rows, not just primaryKeys(): Dexie's live queries don't notice a delete in a keys-only query, so a
+    // removed bookmark stayed on the page until a reload.
+    async () => new Set((await db.bookmarks.where('key').startsWith(prefix).toArray()).map((b) => b.key)),
     [prefix],
   );
   const citing = useLiveQuery(async () => {
@@ -343,7 +345,7 @@ export function BiblePane({ loc, onNavigate, onInsert, onOpenNote, toast, tabs }
             >
               <sup className="vnum">{v.verse}</sup>
               {v.text}
-              {bookmarks?.has(v.key) && <Bookmark className="vmark" size={14} aria-label="Bookmarked" />}
+              {bookmarks?.has(v.key) && <Bookmark className="vmark vmark-bookmark" size={20} fill="currentColor" aria-label="Bookmarked" />}
               {notes && <NotebookText className="vmark" size={14} aria-label={`Cited in ${notes.length} note(s)`} />}
             </p>
           );

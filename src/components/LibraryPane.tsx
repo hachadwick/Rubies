@@ -378,7 +378,8 @@ function Reader({
     [prefix],
   );
   const bookmarks = useLiveQuery(
-    async () => new Set((await db.libraryBookmarks.where('key').startsWith(prefix).primaryKeys()) as string[]),
+    // Whole rows, not just primaryKeys(): see the same query in BiblePane.
+    async () => new Set((await db.libraryBookmarks.where('key').startsWith(prefix).toArray()).map((b) => b.key)),
     [prefix],
   );
   // Bible references in the text, to show as links.
@@ -724,7 +725,7 @@ function Reader({
                       onClick={() => toggle(key)}
                     >
                       {sentenceText(s, pi, si)}
-                      {bookmarks?.has(full) && <Bookmark className="vmark" size={14} aria-label="Bookmarked" />}
+                      {bookmarks?.has(full) && <Bookmark className="vmark vmark-bookmark" size={20} fill="currentColor" aria-label="Bookmarked" />}
                     </span>{' '}
                   </Fragment>
                 );
