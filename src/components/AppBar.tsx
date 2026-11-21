@@ -1,12 +1,23 @@
 import { ActionIcon, Indicator, Text, Tooltip } from '@mantine/core';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Gem, Settings } from 'lucide-react';
+import { useState } from 'react';
 import { db } from '../db';
 import { todayIso } from '../prayer';
 import { FireFlame } from './FireFlame';
 import { InstallButton } from './InstallButton';
 import { SyncButton } from './SyncControls';
 import { UpdateButton } from './UpdateButton';
+
+const PRAYERS_SEEN_KEY = 'rubies.prayersSeen';
+
+function readPrayersSeen(): boolean {
+  try {
+    return localStorage.getItem(PRAYERS_SEEN_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
 
 interface Props {
   onSettings: () => void;
@@ -19,6 +30,19 @@ interface Props {
  * the list of notes or an open note.
  */
 export function AppBar({ onSettings, onPrayers }: Props) {
+  // The flame glows until it's been clicked once on this install, so everyone finds the prayer list; never again after.
+  const [prayersSeen, setPrayersSeen] = useState(readPrayersSeen);
+  const openPrayers = () => {
+    if (!prayersSeen) {
+      setPrayersSeen(true);
+      try {
+        localStorage.setItem(PRAYERS_SEEN_KEY, '1');
+      } catch {
+        /* private mode: it glows again next time */
+      }
+    }
+    onPrayers();
+  };
   const today = todayIso();
   const dueCount = useLiveQuery(
     async () => (await db.prayers.where('followUpOn').belowOrEqual(today).toArray()).filter((p) => !p.answeredAt).length,
@@ -34,7 +58,7 @@ export function AppBar({ onSettings, onPrayers }: Props) {
       <div className="spacer" />
       <Tooltip label={dueCount ? `Prayer list · ${dueCount} to follow up` : 'Prayer list'}>
         <Indicator label={dueCount} size={18} color="red" disabled={!dueCount} offset={6}>
-          <ActionIcon onClick={onPrayers} aria-label={dueCount ? `Prayer list, ${dueCount} to follow up` : 'Prayer list'}>
+          <ActionIcon onClick={openPrayers} className={prayersSeen ? undefined : 'fire-glow'} aria-label={dueCount ? `Prayer list, ${dueCount} to follow up` : 'Prayer list'}>
             <FireFlame />
           </ActionIcon>
         </Indicator>

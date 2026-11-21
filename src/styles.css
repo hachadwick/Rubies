@@ -1073,3 +1073,25 @@ h2 {
 @media (prefers-reduced-motion: reduce) {
   .install-blink { animation-duration: 3s; }
 }
+
+/* The prayer-list flame glows like embers until it's been clicked once on this install (see AppBar). */
+.fire-glow {
+  border-radius: 50%;
+  animation: fire-glow 1.8s ease-in-out infinite;
+}
+.fire-glow svg {
+  filter: drop-shadow(0 0 3px #f97316);
+}
+@keyframes fire-glow {
+  0%, 100% {
+    background: color-mix(in srgb, #f97316 14%, transparent);
+    box-shadow: 0 0 6px 1px color-mix(in srgb, #ef4444 45%, transparent), 0 0 0 0 color-mix(in srgb, #facc15 0%, transparent);
+  }
+  50% {
+    background: color-mix(in srgb, #facc15 26%, transparent);
+    box-shadow: 0 0 16px 5px color-mix(in srgb, #f97316 75%, transparent), 0 0 26px 10px color-mix(in srgb, #facc15 30%, transparent);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fire-glow { animation-duration: 4s; }
+}
