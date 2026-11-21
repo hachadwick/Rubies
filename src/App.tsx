@@ -4,6 +4,7 @@ import { notifications } from '@mantine/notifications';
 import { BellRing, BookOpen, Flame, Library, NotebookPen, TriangleAlert } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { loadBible } from './bible/kjv';
+import { AppBar } from './components/AppBar';
 import { BiblePane, type BibleLocation } from './components/BiblePane';
 import { LibraryPane } from './components/LibraryPane';
 import { ReaderTabs, type Reader } from './components/ReaderTabs';
@@ -173,6 +174,7 @@ export default function App() {
 
   return (
     <div className={`app ${wide ? 'wide' : 'narrow'} show-${tab}`} style={wide ? splitStyle : undefined}>
+      <AppBar onSettings={() => setShowSettings(true)} onPrayers={() => setShowPrayers(true)} />
       {reader === 'bible' ? (
         <BiblePane
           loc={loc}
@@ -211,8 +213,6 @@ export default function App() {
       ) : (
         <NotesList
           onOpen={openNote}
-          onSettings={() => setShowSettings(true)}
-          onPrayers={() => setShowPrayers(true)}
           reviewEveryDays={settings.reviewEveryDays}
         />
       )}

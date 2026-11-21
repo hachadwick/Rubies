@@ -44,6 +44,8 @@ export interface BibleLocation {
   chapter: number;
   /** Verses to scroll to and flash. */
   focus?: [number, number];
+  /** Put the focused verse at the top of the pane (a bookmark or highlight) rather than in the middle. */
+  top?: boolean;
   /** Changes on every navigation so repeated jumps to the same place still scroll. */
   nonce?: number;
 }
@@ -134,7 +136,7 @@ export function BiblePane({ loc, onNavigate, onInsert, onOpenNote, toast, tabs }
     if (loc.focus) {
       setFlash(loc.focus);
       requestAnimationFrame(() =>
-        el.querySelector(`[data-verse="${loc.focus![0]}"]`)?.scrollIntoView({ block: 'center' }),
+        el.querySelector(`[data-verse="${loc.focus![0]}"]`)?.scrollIntoView({ block: loc.top ? 'start' : 'center' }),
       );
       const t = setTimeout(() => setFlash(null), 2200);
       return () => clearTimeout(t);
@@ -165,9 +167,9 @@ export function BiblePane({ loc, onNavigate, onInsert, onOpenNote, toast, tabs }
   useFollowReading('bible', (id) => scroller.current?.querySelector(id === 'title' ? '.chapter-title' : `[data-verse="${id}"]`));
   const readingVerse = reading.owner === 'bible' && reading.status !== 'idle' ? reading.current : undefined;
 
-  const go = (b: number, c: number, focus?: [number, number]) => {
+  const go = (b: number, c: number, focus?: [number, number], top?: boolean) => {
     setPanel(null);
-    onNavigate({ book: b, chapter: c, focus, nonce: Date.now() });
+    onNavigate({ book: b, chapter: c, focus, top, nonce: Date.now() });
   };
 
   const step = (dir: 1 | -1) => {
@@ -313,7 +315,7 @@ export function BiblePane({ loc, onNavigate, onInsert, onOpenNote, toast, tabs }
           onInsert={onInsert}
         />
       )}
-      {panel?.kind === 'saved' && <SavedPanel onGo={(b, c, v) => go(b, c, [v, v])} onClose={() => setPanel(null)} />}
+      {panel?.kind === 'saved' && <SavedPanel onGo={(b, c, v) => go(b, c, [v, v], true)} onClose={() => setPanel(null)} />}
 
       <div className="verses" ref={scroller} hidden={!!panel}>
         <h2 className="chapter-title">

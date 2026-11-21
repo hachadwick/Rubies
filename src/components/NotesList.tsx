@@ -1,9 +1,7 @@
 import {
-  ActionIcon,
   Badge,
   Button,
   Group,
-  Indicator,
   Radio,
   SegmentedControl,
   Stack,
@@ -15,21 +13,15 @@ import {
   UnstyledButton,
 } from '@mantine/core';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { History, NotebookPen, Plus, Search, Settings } from 'lucide-react';
+import { Gem, History, NotebookPen, Plus, Search } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { db, hasSpeaker, kindLabel, newNote, NOTE_KINDS, type Note, type NoteKind } from '../db';
 import { todayIso } from '../prayer';
-import { FireFlame } from './FireFlame';
-import { SyncButton } from './SyncControls';
-import { InstallButton } from './InstallButton';
-import { UpdateButton } from './UpdateButton';
 import { intervalLabel, isStale, reviewedAt, timeAgo } from '../review';
 import { formatDate, noteTitle } from '../util';
 
 interface Props {
   onOpen: (id: string) => void;
-  onSettings: () => void;
-  onPrayers: () => void;
   /** The review interval from Settings (0 = no review reminders). */
   reviewEveryDays: number;
 }
@@ -69,7 +61,7 @@ function readSort(): SortBy {
   }
 }
 
-export function NotesList({ onOpen, onSettings, onPrayers, reviewEveryDays }: Props) {
+export function NotesList({ onOpen, reviewEveryDays }: Props) {
   const [q, setQ] = useState('');
   const [kindFilter, setKindFilter] = useState<KindFilter>(() =>
     readStored<KindFilter>(KIND_KEY, ['all', ...NOTE_KINDS.map((k) => k.value)], 'all'),
@@ -91,11 +83,6 @@ export function NotesList({ onOpen, onSettings, onPrayers, reviewEveryDays }: Pr
     }
   };
   const notes = useLiveQuery(() => db.notes.orderBy('date').reverse().toArray(), []);
-  const today = todayIso();
-  const dueCount = useLiveQuery(
-    async () => (await db.prayers.where('followUpOn').belowOrEqual(today).toArray()).filter((p) => !p.answeredAt).length,
-    [today],
-  );
 
   const stale = useMemo(
     () => (notes ?? []).filter((n) => isStale(n, reviewEveryDays)).sort((a, b) => reviewedAt(a) - reviewedAt(b)),
@@ -140,25 +127,6 @@ export function NotesList({ onOpen, onSettings, onPrayers, reviewEveryDays }: Pr
 
   return (
     <section className="pane notes-pane" aria-label="Sermon notes">
-      <header className="pane-head">
-        <Title order={2} size="h3" pl={6}>
-          Notes
-        </Title>
-        <div className="spacer" />
-        <Tooltip label={dueCount ? `Prayer list · ${dueCount} to follow up` : 'Prayer list'}>
-          <Indicator label={dueCount} size={18} color="red" disabled={!dueCount} offset={6}>
-            <ActionIcon onClick={onPrayers} aria-label={dueCount ? `Prayer list, ${dueCount} to follow up` : 'Prayer list'}>
-              <FireFlame />
-            </ActionIcon>
-          </Indicator>
-        </Tooltip>
-        <UpdateButton />
-        <InstallButton variant="header" />
-        <SyncButton onOpenSettings={onSettings} />
-        <ActionIcon onClick={onSettings} aria-label="Settings">
-          <Settings />
-        </ActionIcon>
-      </header>
       <div className="lookup">
         <TextInput
           type="search"
@@ -289,7 +257,12 @@ export function NotesList({ onOpen, onSettings, onPrayers, reviewEveryDays }: Pr
             </Text>
             <Stack gap="sm">
               {ns.map((n) => (
-                <UnstyledButton key={n.id} className="note-card" onClick={() => onOpen(n.id)}>
+                <UnstyledButton key={n.id} className="note-card has-cap" onClick={() => onOpen(n.id)}>
+                  {/* Decorative: a ruby-coloured cap on the card's leading edge, with a gem in it. */}
+                  <span className="note-cap" aria-hidden="true">
+                    <Gem size={18} strokeWidth={1.75} />
+                  </span>
+                  <div className="note-card-body">
                   <Group justify="space-between" wrap="nowrap" gap="xs" mb={4}>
                     <Text fw={700} size="lg" truncate>
                       {noteTitle(n)}
@@ -313,6 +286,7 @@ export function NotesList({ onOpen, onSettings, onPrayers, reviewEveryDays }: Pr
                       {n.lastReviewedAt ? `Last reviewed ${timeAgo(n.lastReviewedAt)}` : 'Not reviewed yet'}
                     </Text>
                   </Text>
+                  </div>
                 </UnstyledButton>
               ))}
             </Stack>

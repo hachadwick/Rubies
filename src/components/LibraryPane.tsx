@@ -59,6 +59,8 @@ interface Place {
   section: number;
   /** Paragraph and sentence to scroll to and flash. */
   focus?: [number, number];
+  /** Put the focused sentence at the top of the pane (a bookmark or highlight) rather than in the middle. */
+  top?: boolean;
   nonce?: number;
 }
 
@@ -417,7 +419,7 @@ function Reader({
     if (place.focus) {
       setFlash(place.focus);
       requestAnimationFrame(() =>
-        el.querySelector(`[data-s="${place.focus![0]}:${place.focus![1]}"]`)?.scrollIntoView({ block: 'center' }),
+        el.querySelector(`[data-s="${place.focus![0]}:${place.focus![1]}"]`)?.scrollIntoView({ block: place.top ? 'start' : 'center' }),
       );
       const t = setTimeout(() => setFlash(null), 2200);
       return () => clearTimeout(t);
@@ -425,10 +427,10 @@ function Reader({
     el.scrollTop = 0;
   }, [book.id, index, place.focus, place.nonce, section]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const go = (i: number, focus?: [number, number]) => {
+  const go = (i: number, focus?: [number, number], top?: boolean) => {
     setSearch(null);
     setSaved(false);
-    onPlace({ bookId: book.id, section: i, focus, nonce: Date.now() });
+    onPlace({ bookId: book.id, section: i, focus, top, nonce: Date.now() });
   };
 
   const runSearch = async (e: React.FormEvent) => {
@@ -687,7 +689,7 @@ function Reader({
         </div>
       )}
 
-      {saved && <SavedPanel book={book} onGo={(s, p, i) => go(s, [p, i])} onClose={() => setSaved(false)} />}
+      {saved && <SavedPanel book={book} onGo={(s, p, i) => go(s, [p, i], true)} onClose={() => setSaved(false)} />}
 
       <div className="verses book-text" ref={scroller} hidden={!!search || saved}>
         {/* A section that opens with its own heading (most chapters) shows that instead of its name. */}

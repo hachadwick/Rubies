@@ -85,7 +85,7 @@ h2 {
 .app.wide {
   --split: 48.8%;
   grid-template-columns: minmax(min-content, var(--split)) 9px minmax(min-content, 1fr);
-  grid-template-rows: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
 }
 
 /* The divider: a thin line with a grip in the middle, easy to grab (the whole 9px strip, and a little more). */
@@ -150,7 +150,26 @@ h2 {
   }
 }
 .app.narrow {
-  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+/* The bar across the top, above both panes: the app's name and the app-wide buttons, always in view. */
+.app-bar {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 48px;
+  padding: 4px 10px 4px 16px;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--border);
+  background: var(--head-bg);
+}
+.app-bar > :not(.spacer) {
+  flex-shrink: 0;
+}
+.app-bar-gem {
+  margin-right: 4px;
+  color: var(--accent);
 }
 .app.narrow.show-notes .bible-pane,
 .app.narrow.show-bible .notes-pane {
@@ -234,6 +253,11 @@ h2 {
   padding: 4px 22px 150px;
   font: var(--bible-size) / 1.7 var(--serif);
   -webkit-overflow-scrolling: touch;
+}
+/* A verse or sentence scrolled to the top of the pane (from a bookmark) keeps a little air above it. */
+.verses [data-verse],
+.verses [data-s] {
+  scroll-margin-top: 12px;
 }
 .verses[hidden] {
   display: none;
@@ -392,6 +416,26 @@ h2 {
 }
 .note-card:active {
   transform: scale(0.99);
+}
+/* A note card with a decorative cap on its leading edge: the app's ruby, with a gem inside. */
+.note-card.has-cap {
+  display: flex;
+  padding: 0;
+  overflow: hidden;
+}
+.note-cap {
+  flex: none;
+  width: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--mantine-primary-color-filled);
+  color: var(--mantine-primary-color-contrast);
+}
+.note-card-body {
+  flex: 1;
+  min-width: 0;
+  padding: 14px 16px;
 }
 .fab {
   position: absolute;
