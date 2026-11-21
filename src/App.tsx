@@ -212,7 +212,6 @@ export default function App() {
           onBack={() => setNoteId(null)}
           registerInserter={registerInserter}
           toast={toast}
-          onOpenPrayers={() => setShowPrayers(true)}
           reviewEveryDays={settings.reviewEveryDays}
         />
       ) : (

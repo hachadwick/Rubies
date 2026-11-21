@@ -14,9 +14,10 @@ import {
   useMantineColorScheme,
   type MantineColorScheme,
 } from '@mantine/core';
-import { Download, Monitor, Moon, Sun, Upload } from 'lucide-react';
+import { Download, FolderArchive, Monitor, Moon, Sun, Upload } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { exportBackup, importBackup } from '../db';
+import { db, exportBackup, importBackup } from '../db';
+import { exportNotesZip } from '../exporting';
 import { useInstall } from '../install';
 import { REVIEW_CHOICES } from '../review';
 import type { Settings } from '../settings';
@@ -64,6 +65,24 @@ export function SettingsDialog({ opened, settings, onChange, onClose, toast }: P
     const backup = await exportBackup();
     const stamp = new Date().toISOString().slice(0, 10);
     await saveFile(`rubies-backup-${stamp}.json`, JSON.stringify(backup), 'application/json');
+  };
+
+  /** Every note as its own Word file or PDF, in one zip (the same as in a note's export menu). */
+  const [exporting, setExporting] = useState<'docx' | 'pdf' | null>(null);
+  const exportAll = async (format: 'docx' | 'pdf') => {
+    const kind = format === 'pdf' ? 'PDFs' : 'Word documents';
+    setExporting(format);
+    try {
+      const notes = await db.notes.toArray();
+      if (!notes.length) return toast('There are no notes to export yet');
+      const count = await exportNotesZip(notes, format);
+      toast(`Exported ${count} ${count === 1 ? 'note' : 'notes'} as ${kind}`);
+    } catch (err) {
+      console.error(err);
+      toast(`Export failed: ${(err as Error).message}`);
+    } finally {
+      setExporting(null);
+    }
   };
 
   const doImport = async (f: File | null) => {
@@ -154,6 +173,29 @@ export function SettingsDialog({ opened, settings, onChange, onClose, toast }: P
                 </Button>
               )}
             </FileButton>
+          </Group>
+          <Text size="sm" c="dimmed" mt="sm">
+            Or export every note to read or print elsewhere: one file per note, together in a zip.
+          </Text>
+          <Group grow>
+            <Button
+              variant="light"
+              leftSection={<FolderArchive size={18} />}
+              onClick={() => exportAll('docx')}
+              loading={exporting === 'docx'}
+              disabled={exporting === 'pdf'}
+            >
+              All notes as Word
+            </Button>
+            <Button
+              variant="light"
+              leftSection={<FolderArchive size={18} />}
+              onClick={() => exportAll('pdf')}
+              loading={exporting === 'pdf'}
+              disabled={exporting === 'docx'}
+            >
+              All notes as PDF
+            </Button>
           </Group>
         </Section>
 

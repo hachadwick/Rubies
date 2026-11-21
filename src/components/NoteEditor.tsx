@@ -28,7 +28,6 @@ import { escapeHtml, formatDate, noteTitle } from '../util';
 import { refsLabel } from './BiblePane';
 import { InkPad } from './InkPad';
 import { ConfirmDialog } from './ConfirmDialog';
-import { PrayerQuickAdd } from './PrayerQuickAdd';
 import { SERIF } from '../theme';
 import { Quote, QuoteCite } from '../quote';
 import type { Insertion } from '../insertion';
@@ -41,7 +40,6 @@ interface Props {
   registerInserter: (fn: ((what: Insertion) => void) | null) => void;
   toast: (msg: string) => void;
   /** Opens the prayer list over the note. */
-  onOpenPrayers: () => void;
   /** The review interval from Settings (0 = no review reminders). */
   reviewEveryDays: number;
 }
@@ -129,7 +127,7 @@ function FloatInput({ alwaysFloat, onFocus, onBlur, ...props }: TextInputProps &
   );
 }
 
-function Editor_({ initial, onBack, registerInserter, toast, onOpenPrayers, reviewEveryDays }: Props & { initial: Note }) {
+function Editor_({ initial, onBack, registerInserter, toast, reviewEveryDays }: Props & { initial: Note }) {
   const [lastReviewedAt, setLastReviewedAt] = useState(initial.lastReviewedAt);
   const [meta, setMeta] = useState(() => ({
     title: initial.title,
@@ -292,16 +290,6 @@ function Editor_({ initial, onBack, registerInserter, toast, onOpenPrayers, revi
           ]}
         />
         <div className="spacer" />
-        <PrayerQuickAdd
-          noteId={initial.id}
-          getNoteTitle={() => noteTitle(noteRef.current)}
-          getSelection={() => {
-            const sel = editor?.state.selection;
-            return sel && !sel.empty ? editor.state.doc.textBetween(sel.from, sel.to, ' ') : '';
-          }}
-          onOpenList={onOpenPrayers}
-          toast={toast}
-        />
         <ExportMenu getNote={async () => (await flush(), noteRef.current)} toast={toast} />
         <Tooltip label="Delete note">
           <ActionIcon color="red" onClick={() => setConfirmDelete(true)} aria-label="Delete note">

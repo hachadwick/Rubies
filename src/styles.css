@@ -1439,20 +1439,3 @@ h2 {
     font-size: 19px;
   }
 }
-
-/* "Add to prayer list" in a note's header: the flame with a small plus, so it isn't taken for the prayer list
-   button in the top bar (the plain flame). */
-.flame-add {
-  position: relative;
-  display: inline-flex;
-}
-.flame-add-plus {
-  position: absolute;
-  right: -7px;
-  bottom: -4px;
-  padding: 1px;
-  border-radius: 50%;
-  background: var(--mantine-color-orange-6);
-  color: #fff;
-  box-shadow: 0 0 0 2px var(--mantine-color-body);
-}

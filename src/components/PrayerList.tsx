@@ -98,7 +98,7 @@ export function PrayerList({ opened, onClose, onOpenNote }: Props) {
             </ThemeIcon>
             <Text fw={600}>No prayer requests yet</Text>
             <Text size="sm" c="dimmed" maw={320}>
-              While taking notes, use the flame button in the note's header (or Ctrl+Shift+P) to add one without leaving your note.
+              Add someone or something to pray for above. The flame at the top of the app brings you back here from anywhere.
             </Text>
           </Stack>
         )}
