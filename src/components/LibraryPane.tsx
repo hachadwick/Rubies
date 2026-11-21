@@ -141,34 +141,94 @@ function Shelf({ onOpen, toast }: { onOpen: (bookId: string) => void; toast: (ms
   const books = useLiveQuery(() => db.libraryBooks.orderBy('importedAt').reverse().toArray(), []);
   const syncing = useSyncState().status !== 'off';
   const input = useRef<HTMLInputElement>(null);
-  const [importing, setImporting] = useState<{ name: string; done: number; total: number; abort: AbortController } | null>(null);
+  const [importing, setImporting] = useState<{ name: string; done: number; total: number; nth: number; of: number; abort: AbortController } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /** True while files are being dragged over the shelf. */
+  const [dropping, setDropping] = useState(false);
+  const dragDepth = useRef(0);
   const [editing, setEditing] = useState<LibraryBook | null>(null);
   const [deleting, setDeleting] = useState<LibraryBook | null>(null);
 
-  const start = async (file: File) => {
+  /** Imports the PDFs among these files, one after another (chosen in the picker or dropped on the shelf). */
+  const start = async (chosen: File[]) => {
+    if (importing) return;
+    const files = chosen.filter((f) => f.type === 'application/pdf' || /\.pdf$/i.test(f.name));
+    const skipped = chosen.length - files.length;
     setError(null);
+    if (!files.length) {
+      if (skipped) setError('Only PDF files can be imported.');
+      return;
+    }
     const abort = new AbortController();
-    setImporting({ name: file.name, done: 0, total: 0, abort });
+    const imported: LibraryBook[] = [];
+    const failed: string[] = [];
     try {
-      const book = await importPdf(file, (done, total) => setImporting((s) => s && { ...s, done, total }), abort.signal);
-      toast(`Imported ${book.title}`);
-      onOpen(book.id);
-    } catch (e) {
-      if ((e as Error).name !== 'AbortError') setError((e as Error).message || 'This PDF could not be imported.');
+      for (const [i, file] of files.entries()) {
+        setImporting({ name: file.name, done: 0, total: 0, nth: i + 1, of: files.length, abort });
+        try {
+          imported.push(await importPdf(file, (done, total) => setImporting((s) => s && { ...s, done, total }), abort.signal));
+        } catch (e) {
+          // Cancel stops the ones still waiting too; a PDF that won't import doesn't hold up the rest.
+          if ((e as Error).name === 'AbortError') break;
+          failed.push(files.length === 1 ? (e as Error).message || 'This PDF could not be imported.' : `${file.name}: ${(e as Error).message || 'could not be imported'}`);
+        }
+      }
     } finally {
       setImporting(null);
     }
+    if (skipped) failed.push(skipped === 1 ? '1 file wasn’t a PDF and was left out.' : `${skipped} files weren’t PDFs and were left out.`);
+    if (failed.length) setError(failed.join('\n'));
+    if (imported.length === 1) {
+      toast(`Imported ${imported[0].title}`);
+      // One book opens straight away; several stay on the shelf to choose from.
+      if (files.length === 1) onOpen(imported[0].id);
+    } else if (imported.length) toast(`Imported ${imported.length} books`);
   };
+
+  const hasFiles = (e: React.DragEvent) => [...e.dataTransfer.types].includes('Files');
 
   const importButton = (
     <Button leftSection={<FileUp size={18} />} onClick={() => input.current?.click()} disabled={!!importing}>
-      Import PDF
+      Import PDFs
     </Button>
   );
 
   return (
-    <>
+    // The whole shelf takes PDFs dragged in from the desktop or a folder.
+    <div
+      className="shelf-drop"
+      onDragEnter={(e) => {
+        if (!hasFiles(e)) return;
+        e.preventDefault();
+        dragDepth.current += 1;
+        setDropping(true);
+      }}
+      onDragOver={(e) => {
+        if (!hasFiles(e)) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = importing ? 'none' : 'copy';
+      }}
+      onDragLeave={(e) => {
+        if (!hasFiles(e)) return;
+        dragDepth.current = Math.max(0, dragDepth.current - 1);
+        if (!dragDepth.current) setDropping(false);
+      }}
+      onDrop={(e) => {
+        if (!hasFiles(e)) return;
+        e.preventDefault();
+        dragDepth.current = 0;
+        setDropping(false);
+        start([...e.dataTransfer.files]);
+      }}
+    >
+      {dropping && (
+        <div className="shelf-drop-hint" aria-hidden="true">
+          <FileUp size={32} />
+          <Text fw={700} fz="lg">
+            {importing ? 'Wait for this import to finish' : 'Drop PDFs to import them'}
+          </Text>
+        </div>
+      )}
       <header className="pane-head">
         <Text fw={700} fz={20} px="xs">
           Library
@@ -179,12 +239,13 @@ function Shelf({ onOpen, toast }: { onOpen: (bookId: string) => void; toast: (ms
           ref={input}
           type="file"
           accept="application/pdf,.pdf"
+          multiple
           hidden
-          aria-label="Choose a PDF to import"
+          aria-label="Choose PDFs to import"
           onChange={(e) => {
-            const file = e.currentTarget.files?.[0];
+            const files = [...(e.currentTarget.files ?? [])];
             e.currentTarget.value = '';
-            if (file) start(file);
+            if (files.length) start(files);
           }}
         />
       </header>
@@ -194,7 +255,7 @@ function Shelf({ onOpen, toast }: { onOpen: (bookId: string) => void; toast: (ms
           <Paper withBorder radius="lg" p="md" mt="md">
             <Group justify="space-between" wrap="nowrap" mb="xs">
               <Text size="sm" fw={600} truncate>
-                Importing {importing.name}
+                {importing.of > 1 ? `Importing ${importing.nth} of ${importing.of}: ${importing.name}` : `Importing ${importing.name}`}
               </Text>
               <Button size="compact-sm" variant="subtle" color="gray" onClick={() => importing.abort.abort()}>
                 Cancel
@@ -207,7 +268,7 @@ function Shelf({ onOpen, toast }: { onOpen: (bookId: string) => void; toast: (ms
           </Paper>
         )}
         {error && (
-          <Alert color="red" radius="lg" mt="md" title="Couldn’t import that PDF" withCloseButton onClose={() => setError(null)}>
+          <Alert color="red" radius="lg" mt="md" title="Some things couldn’t be imported" withCloseButton onClose={() => setError(null)} style={{ whiteSpace: 'pre-line' }}>
             {error}
           </Alert>
         )}
@@ -221,8 +282,8 @@ function Shelf({ onOpen, toast }: { onOpen: (bookId: string) => void; toast: (ms
               Your library is empty
             </Text>
             <Text c="dimmed" size="sm" maw={340}>
-              Import a book as a PDF to read and study it here. Its text is brought in like the Bible’s, so you can
-              tap any sentence and add it to your notes.
+Import books as PDFs to read and study them here: choose them, or drag them in from your desktop. Their text
+              is brought in like the Bible’s, so you can tap any sentence and add it to your notes.
             </Text>
             {importButton}
           </Stack>
@@ -295,7 +356,7 @@ function Shelf({ onOpen, toast }: { onOpen: (bookId: string) => void; toast: (ms
         “{deleting?.title}” will be removed from your library{syncing ? ' on all your devices' : ''}. Quotes you’ve
         already added to notes stay. You can import the PDF again later.
       </ConfirmDialog>
-    </>
+    </div>
   );
 }
 

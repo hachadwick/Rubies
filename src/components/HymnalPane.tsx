@@ -1,5 +1,5 @@
 import { ActionIcon, Loader, Text, TextInput, Tooltip, UnstyledButton } from '@mantine/core';
-import { ChevronDown, ChevronLeft, ChevronRight, Maximize, Minimize, Search, TriangleAlert } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, Delete, Hash, Maximize, Minimize, Search, TriangleAlert } from 'lucide-react';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { drawPage, LAST_PAGE, neighbour, PAGE_RATIO, searchSongs, songAt, songPages, type Song } from '../hymnal/hymnal';
@@ -222,6 +222,41 @@ function FullScreen({ page, onPage, onClose }: { page: number; onPage: (page: nu
   const slides = useRef<HTMLDivElement>(null);
   const [controls, setControls] = useState(true);
   const hideTimer = useRef(0);
+  // Going to another page without leaving full screen: the digits typed so far (null while the keypad is closed).
+  const [typing, setTyping] = useState<string | null>(null);
+  const goTimer = useRef(0);
+  const typedPage = typing ? Number(typing) : 0;
+
+  const goTo = useCallback(
+    (p: number) => {
+      window.clearTimeout(goTimer.current);
+      setTyping(null);
+      if (p >= 1 && p <= LAST_PAGE) onPage(p);
+    },
+    [onPage],
+  );
+  /** Adds a digit. As soon as the number can't be the start of a longer page number, it goes there by itself. */
+  const press = useCallback(
+    (digit: string) => {
+      window.clearTimeout(goTimer.current);
+      setTyping((was) => {
+        const now = ((was ?? '') + digit).replace(/^0+/, '');
+        const n = Number(now);
+        // A digit that would run past the last page isn't taken.
+        if (n > LAST_PAGE) return was ?? '';
+        // A moment to see the number before the page turns.
+        window.clearTimeout(goTimer.current);
+        if (n >= 1 && n * 10 > LAST_PAGE) goTimer.current = window.setTimeout(() => goTo(n), 220);
+        return now;
+      });
+    },
+    [goTo],
+  );
+  const erase = useCallback(() => {
+    window.clearTimeout(goTimer.current);
+    setTyping((was) => (was ?? '').slice(0, -1));
+  }, []);
+  useEffect(() => () => window.clearTimeout(goTimer.current), []);
 
   const wake = useCallback(() => {
     setControls(true);
@@ -277,7 +312,13 @@ function FullScreen({ page, onPage, onClose }: { page: number; onPage: (page: nu
 
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      // Typing a number goes to that page, with or without the keypad open.
+      if (/^[0-9]$/.test(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey) press(e.key);
+      else if (typing !== null && e.key === 'Backspace') erase();
+      else if (typing !== null && e.key === 'Enter') goTo(typedPage);
+      else if (typing !== null && e.key === 'Escape') setTyping(null);
+      else if (typing !== null) return;
+      else if (e.key === 'Escape') onClose();
       else if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') turn(1, true);
       else if (e.key === 'ArrowLeft' || e.key === 'PageUp') turn(-1, true);
       else return;
@@ -286,7 +327,7 @@ function FullScreen({ page, onPage, onClose }: { page: number; onPage: (page: nu
     };
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);
-  }, [turn, onClose, wake]);
+  }, [turn, onClose, wake, typing, typedPage, press, erase, goTo]);
 
   const onScroll = () => {
     const el = slides.current;
@@ -333,6 +374,41 @@ function FullScreen({ page, onPage, onClose }: { page: number; onPage: (page: nu
             <Minimize />
           </ActionIcon>
         </div>
+
+        {/* Always there (dimmer while the other buttons are away), so another page is one tap and its number away. */}
+        <UnstyledButton className="hymn-goto" onClick={() => setTyping('')} aria-label="Go to a page">
+          <Hash size={18} />
+          Go to
+        </UnstyledButton>
+
+        {typing !== null && (
+          <div className="hymn-keypad-back" onClick={() => setTyping(null)}>
+            <div className="hymn-keypad" role="group" aria-label="Go to a page" onClick={(e) => e.stopPropagation()}>
+              <div className="hymn-keypad-number" aria-live="polite">
+                {typing || <span>Page</span>}
+              </div>
+              <Text size="sm" ta="center" truncate className="hymn-keypad-title">
+                {typedPage ? songAt(typedPage).title : `1 to ${LAST_PAGE}`}
+              </Text>
+              <div className="hymn-keys">
+                {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((d) => (
+                  <UnstyledButton key={d} className="hymn-key" onClick={() => press(d)}>
+                    {d}
+                  </UnstyledButton>
+                ))}
+                <UnstyledButton className="hymn-key" onClick={erase} aria-label="Delete the last digit" disabled={!typing}>
+                  <Delete />
+                </UnstyledButton>
+                <UnstyledButton className="hymn-key" onClick={() => press('0')}>
+                  0
+                </UnstyledButton>
+                <UnstyledButton className="hymn-key hymn-key-go" onClick={() => goTo(typedPage)} disabled={!typedPage}>
+                  Go
+                </UnstyledButton>
+              </div>
+            </div>
+          </div>
+        )}
 
         {pages.length > 1 && (
           <div className="hymn-dots" aria-hidden="true">
