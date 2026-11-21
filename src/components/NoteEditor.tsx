@@ -18,8 +18,8 @@ import { RichTextEditor } from '@mantine/tiptap';
 import Highlight from '@tiptap/extension-highlight';
 import { useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
-import { ArrowLeft, CalendarCheck, Check, ChevronDown, ChevronUp, History, Copy, FileDown, FileText, Loader2, Mail, PenLine, Share, Share2, Trash2, Type } from 'lucide-react';
-import { canShare, copyNote, emailNote, exportPdf, exportWord, shareNote } from '../exporting';
+import { ArrowLeft, CalendarCheck, Check, ChevronDown, ChevronUp, History, Copy, FileDown, FileText, FolderArchive, Loader2, Mail, PenLine, Share, Share2, Trash2, Type } from 'lucide-react';
+import { canShare, copyNote, emailNote, exportNotesZip, exportPdf, exportWord, shareNote } from '../exporting';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getPassage, refKeys } from '../bible/kjv';
 import { extractRefs, formatRef, parseRefs, type Ref } from '../bible/reference';
@@ -503,6 +503,23 @@ function ExportMenu({ getNote, toast }: { getNote: () => Promise<Note>; toast: (
     }
   };
 
+  /** Every note, each as its own Word file or PDF, in one zip. */
+  const runAll = (format: 'docx' | 'pdf') => async () => {
+    const label = format === 'pdf' ? 'PDF export' : 'Word export';
+    setBusy(label);
+    try {
+      // Save what's being typed first, so the open note goes in as it is now.
+      await getNote();
+      const count = await exportNotesZip(await db.notes.toArray(), format);
+      toast(`Exported ${count} ${count === 1 ? 'note' : 'notes'} as ${format === 'pdf' ? 'PDFs' : 'Word documents'}`);
+    } catch (err) {
+      console.error(err);
+      toast(`${label} failed: ${(err as Error).message}`);
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const sharing = canShare();
 
   return (
@@ -524,6 +541,14 @@ function ExportMenu({ getNote, toast }: { getNote: () => Promise<Note>; toast: (
           onClick={run('PDF export', exportPdf, (r) => (r === 'saved' ? 'PDF saved' : null))}
         >
           PDF
+        </Menu.Item>
+        <Menu.Divider />
+        <Menu.Label>Export all notes</Menu.Label>
+        <Menu.Item leftSection={<FolderArchive size={18} />} onClick={runAll('docx')}>
+          Word documents, in a zip
+        </Menu.Item>
+        <Menu.Item leftSection={<FolderArchive size={18} />} onClick={runAll('pdf')}>
+          PDFs, in a zip
         </Menu.Item>
         <Menu.Divider />
         <Menu.Label>Share</Menu.Label>

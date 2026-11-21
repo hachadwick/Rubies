@@ -13,6 +13,8 @@
  * - Lines in larger type are headings. Very large ones start a chapter, unless the PDF has its own table of
  *   contents (bookmarks), which is used instead. A book with neither is split every ten pages.
  */
+import { repairUnreadable, UNREADABLE } from './repair';
+
 
 export interface RawItem {
   str: string;
@@ -342,6 +344,7 @@ export function parseBook(raw: RawPage[], opts: { fileName: string; metaTitle?: 
   const labels = raw.map((p) => p.label);
   const bs = blocks(pages, body).filter((b) => b.lines.some((l) => l.text.trim()));
   if (!bs.some((b) => !b.heading)) throw new Error('No text found in this PDF. It may be scanned pages (pictures of text), which can’t be imported.');
+  repairUnreadable(bs);
 
   const sections: ParsedSection[] = [];
   const outline = (opts.outline ?? []).filter((o) => o.title.trim() && o.page >= 0).sort((a, b) => a.page - b.page);
@@ -388,7 +391,9 @@ export function parseBook(raw: RawPage[], opts: { fileName: string; metaTitle?: 
   const usableMeta = meta && !/\.(docx?|indd|pdf|qxd|pages)$|^(untitled|microsoft word)/i.test(meta) ? meta : '';
   // A big heading on the first page that isn't a chapter label is the title page.
   const firstHeading = bs[0]?.heading && bs[0].lines[0].page === 0 ? headingParts(bs[0])[0] : '';
-  const title = usableMeta || (firstHeading && !LABEL_LINE.test(firstHeading) ? firstHeading : '') || cleanFileName(opts.fileName);
+  // A title that still has letters missing is no use: the file's name is better.
+  const readable = (s: string) => (s.includes(UNREADABLE) ? '' : s);
+  const title = readable(usableMeta) || (firstHeading && !LABEL_LINE.test(firstHeading) ? readable(firstHeading) : '') || cleanFileName(opts.fileName);
 
   return { title, sections: sections.filter((s) => s.paras.length) };
 }

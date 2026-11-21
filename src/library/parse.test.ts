@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { citation } from './library';
+import { repairUnreadable } from './repair';
 import { joinLines, parseBook, splitSentences, titleCase, type RawItem, type RawPage } from './parse';
 
 /** A page of body text at 10.5pt, one line every 15 units from the top, with a running head and page number. */
@@ -110,6 +111,33 @@ describe('parseBook', () => {
 
   it('explains a PDF with no text', () => {
     expect(() => parseBook([{ items: [], width: 400, height: 600, label: '1' }], { fileName: 'scan.pdf' })).toThrow(/scanned/);
+  });
+});
+
+describe('repairUnreadable', () => {
+  const block = (...lines: string[]) => ({ lines: lines.map((text) => ({ text })) });
+  it('fills letters a cover font could not name from the same words in plain type', () => {
+    const cover = block('THE �EW', 'TH�O�E', 'OF �AVI�');
+    repairUnreadable([cover, block('The New Throne of David'), block('Those who had to work fasted instead.')]);
+    expect(cover.lines.map((l) => l.text)).toEqual(['THE NEW', 'THRONE', 'OF DAVID']);
+  });
+  it('leaves text alone when nothing else in the book matches', () => {
+    const cover = block('�UBIES');
+    repairUnreadable([cover, block('A book about something else entirely.')]);
+    expect(cover.lines[0].text).toBe('�UBIES');
+  });
+});
+
+describe('repairUnreadable: spaced-out letters', () => {
+  it('closes up letters spread out for show when the words appear normally elsewhere', () => {
+    const cover = { lines: [{ text: 'G E R A L D F L U R R Y' }] };
+    repairUnreadable([cover, { lines: [{ text: 'Gerald Flurry' }] }]);
+    expect(cover.lines[0].text).toBe('GERALD FLURRY');
+  });
+  it('leaves ordinary short words alone', () => {
+    const line = { lines: [{ text: 'It is as we go to do it' }] };
+    repairUnreadable([line, { lines: [{ text: 'Something else.' }] }]);
+    expect(line.lines[0].text).toBe('It is as we go to do it');
   });
 });
 

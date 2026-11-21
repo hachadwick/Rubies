@@ -1375,3 +1375,84 @@ h2 {
   color: var(--accent);
   pointer-events: none;
 }
+
+/* Full screen: every page number, to tap. Opened from the song's name or the top of the page. */
+.hymn-full-title {
+  pointer-events: auto;
+  text-align: left;
+}
+.hymn-picker {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  overflow-y: auto;
+  padding: calc(env(safe-area-inset-top) + 12px) calc(env(safe-area-inset-right) + 12px) calc(env(safe-area-inset-bottom) + 12px)
+    calc(env(safe-area-inset-left) + 12px);
+  background: rgb(0 0 0 / 0.82);
+  backdrop-filter: blur(6px);
+}
+.hymn-picker-grid {
+  width: 100%;
+  max-width: 900px;
+  margin: auto;
+  display: grid;
+  /* Eight across on a phone, so all 128 fit on the screen without scrolling. */
+  grid-template-columns: repeat(auto-fill, minmax(38px, 1fr));
+  gap: 5px;
+}
+.hymn-pick {
+  display: grid;
+  place-items: center;
+  height: 40px;
+  border-radius: 10px;
+  background: #2f2f33;
+  color: #fff;
+  font-size: 17px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  touch-action: manipulation;
+}
+.hymn-pick[data-second] {
+  background: #222225;
+  color: rgb(255 255 255 / 0.6);
+}
+.hymn-pick[data-current] {
+  background: var(--mantine-color-ruby-9);
+  color: #fff;
+}
+.hymn-pick:active {
+  background: #47474d;
+}
+@media (hover: hover) {
+  .hymn-pick:hover {
+    outline: 2px solid rgb(255 255 255 / 0.5);
+  }
+}
+/* Room for bigger keys on a tablet or desktop. */
+@media (min-width: 700px) and (min-height: 600px) {
+  .hymn-picker-grid {
+    grid-template-columns: repeat(auto-fill, minmax(52px, 1fr));
+    gap: 7px;
+  }
+  .hymn-pick {
+    height: 52px;
+    font-size: 19px;
+  }
+}
+
+/* "Add to prayer list" in a note's header: the flame with a small plus, so it isn't taken for the prayer list
+   button in the top bar (the plain flame). */
+.flame-add {
+  position: relative;
+  display: inline-flex;
+}
+.flame-add-plus {
+  position: absolute;
+  right: -7px;
+  bottom: -4px;
+  padding: 1px;
+  border-radius: 50%;
+  background: var(--mantine-color-orange-6);
+  color: #fff;
+  box-shadow: 0 0 0 2px var(--mantine-color-body);
+}

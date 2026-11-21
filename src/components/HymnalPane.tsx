@@ -258,6 +258,16 @@ function FullScreen({ page, onPage, onClose }: { page: number; onPage: (page: nu
   }, []);
   useEffect(() => () => window.clearTimeout(goTimer.current), []);
 
+  // Every page number laid out to tap: opened from the song's name, or from the top of the page itself, where
+  // its number and title are printed.
+  const [picking, setPicking] = useState(false);
+  const tapPage = (e: React.MouseEvent) => {
+    const sheet = (e.target as HTMLElement).closest('.hymn-page')?.getBoundingClientRect();
+    if (sheet && e.clientY < sheet.top + sheet.height * 0.16) setPicking(true);
+    else if (controls) setControls(false);
+    else wake();
+  };
+
   const wake = useCallback(() => {
     setControls(true);
     window.clearTimeout(hideTimer.current);
@@ -313,7 +323,11 @@ function FullScreen({ page, onPage, onClose }: { page: number; onPage: (page: nu
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
       // Typing a number goes to that page, with or without the keypad open.
-      if (/^[0-9]$/.test(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey) press(e.key);
+      if (picking && e.key === 'Escape') setPicking(false);
+      else if (/^[0-9]$/.test(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        setPicking(false);
+        press(e.key);
+      }
       else if (typing !== null && e.key === 'Backspace') erase();
       else if (typing !== null && e.key === 'Enter') goTo(typedPage);
       else if (typing !== null && e.key === 'Escape') setTyping(null);
@@ -327,7 +341,7 @@ function FullScreen({ page, onPage, onClose }: { page: number; onPage: (page: nu
     };
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);
-  }, [turn, onClose, wake, typing, typedPage, press, erase, goTo]);
+  }, [turn, onClose, wake, typing, typedPage, press, erase, goTo, picking]);
 
   const onScroll = () => {
     const el = slides.current;
@@ -342,7 +356,7 @@ function FullScreen({ page, onPage, onClose }: { page: number; onPage: (page: nu
   // On top of the whole app, not inside the pane (which clips what's in it).
   return createPortal(
       <div className="hymn-full" data-controls={controls || undefined} role="dialog" aria-label={`${song.title}, full screen`} onPointerMove={(e) => e.pointerType === 'mouse' && wake()}>
-        <div className="hymn-slides" ref={slides} onScroll={onScroll} onClick={() => (controls ? setControls(false) : wake())}>
+        <div className="hymn-slides" ref={slides} onScroll={onScroll} onClick={tapPage}>
           {pages.map((p) => (
             <div className="hymn-slide" key={p}>
               <div className="hymn-fit">
@@ -353,7 +367,7 @@ function FullScreen({ page, onPage, onClose }: { page: number; onPage: (page: nu
         </div>
 
         {/* In the corners, where a page that fits the screen leaves room: the song on one side, the buttons on the other. */}
-        <div className="hymn-full-title hymn-full-chip">
+        <UnstyledButton className="hymn-full-title hymn-full-chip" onClick={() => setPicking(true)} aria-label="Choose another page">
           <Text fw={700} size="sm" lineClamp={3}>
             {song.page} · {song.title}
           </Text>
@@ -362,7 +376,7 @@ function FullScreen({ page, onPage, onClose }: { page: number; onPage: (page: nu
               Page {page - song.page + 1} of {pages.length} · swipe to turn
             </Text>
           )}
-        </div>
+        </UnstyledButton>
         <div className="hymn-full-actions hymn-full-chip" onPointerDown={wake}>
           <ActionIcon variant="filled" color="dark" onClick={() => prev && onPage(prev.page)} disabled={!prev} aria-label="Previous song">
             <ChevronLeft />
@@ -376,10 +390,34 @@ function FullScreen({ page, onPage, onClose }: { page: number; onPage: (page: nu
         </div>
 
         {/* Always there (dimmer while the other buttons are away), so another page is one tap and its number away. */}
-        <UnstyledButton className="hymn-goto" onClick={() => setTyping('')} aria-label="Go to a page">
+        <UnstyledButton className="hymn-goto" onClick={() => setPicking(true)} aria-label="Go to a page">
           <Hash size={18} />
           Go to
         </UnstyledButton>
+
+        {picking && (
+          <div className="hymn-picker" role="group" aria-label="Choose a page" onClick={() => setPicking(false)}>
+            <div className="hymn-picker-grid">
+              {Array.from({ length: LAST_PAGE }, (_, i) => i + 1).map((p) => (
+                <UnstyledButton
+                  key={p}
+                  className="hymn-pick"
+                  data-current={pages.includes(p) || undefined}
+                  // The second page of a song: still its own number to tap, shown a little quieter.
+                  data-second={songAt(p).page !== p || undefined}
+                  aria-label={`Page ${p}: ${songAt(p).title}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setPicking(false);
+                    goTo(p);
+                  }}
+                >
+                  {p}
+                </UnstyledButton>
+              ))}
+            </div>
+          </div>
+        )}
 
         {typing !== null && (
           <div className="hymn-keypad-back" onClick={() => setTyping(null)}>

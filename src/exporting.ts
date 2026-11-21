@@ -220,6 +220,11 @@ function inkParagraphs(images: InkImage[]): Paragraph[] {
 }
 
 export async function exportWord(n: Note): Promise<void> {
+  await saveBlob(`${noteFileBase(n)}.docx`, await noteToDocx(n));
+}
+
+/** The note as a Word file. */
+async function noteToDocx(n: Note): Promise<Blob> {
   const html = new DOMParser().parseFromString(`<div>${n.bodyHtml}</div>`, 'text/html').body.firstElementChild!;
   const ctx: BlockCtx = { quote: false, listInstance: { n: 0 } };
   const body = blocks(html, ctx);
@@ -265,8 +270,40 @@ export async function exportWord(n: Note): Promise<void> {
       },
     ],
   });
-  const blob = await Packer.toBlob(doc);
-  await saveBlob(`${noteFileBase(n)}.docx`, blob);
+  return Packer.toBlob(doc);
+}
+
+// ---------------------------------------------------------------------------
+// Every note at once, as a zip of Word files or of PDFs
+// ---------------------------------------------------------------------------
+
+/**
+ * Saves one zip file with a Word file or a PDF for each of these notes. `onProgress` is told as each is written.
+ * Returns how many went in.
+ */
+export async function exportNotesZip(notes: Note[], format: 'docx' | 'pdf', onProgress?: (done: number, total: number) => void): Promise<number> {
+  const [{ zipSync }, pdf] = await Promise.all([import('fflate'), format === 'pdf' ? import('./notePdf') : null]);
+  const files: Record<string, Uint8Array> = {};
+  // Newest first, like the list of notes.
+  const ordered = [...notes].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : b.updatedAt - a.updatedAt));
+  for (const [i, n] of ordered.entries()) {
+    const bytes = pdf
+      ? await pdf.noteToPdf(n, noteMetaParts(n), await renderInkImages(n.ink))
+      : new Uint8Array(await (await noteToDocx(n)).arrayBuffer());
+    // Two notes with the same title and date still get a file each.
+    const base = noteFileBase(n);
+    let name = `${base}.${format}`;
+    for (let k = 2; name.toLowerCase() in files || Object.keys(files).some((f) => f.toLowerCase() === name.toLowerCase()); k++) name = `${base} (${k}).${format}`;
+    files[name] = bytes;
+    onProgress?.(i + 1, ordered.length);
+    // Let the screen catch up between notes.
+    await new Promise((r) => setTimeout(r));
+  }
+  // Word files and PDFs are already compressed inside; storing them as they are is quicker and no bigger.
+  const zip = zipSync(files, { level: 0 });
+  const today = new Date().toLocaleDateString('en-CA');
+  await saveBlob(`Rubies notes - ${format === 'pdf' ? 'PDF' : 'Word'} (${today}).zip`, new Blob([zip as BlobPart], { type: 'application/zip' }));
+  return ordered.length;
 }
 
 // ---------------------------------------------------------------------------
